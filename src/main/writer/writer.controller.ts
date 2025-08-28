@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Body,
   Controller,
@@ -18,22 +19,22 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { GetUser, ValidateAuth } from '@project/common/jwt/jwt.decorator';
 import { createPostSwaggerSchema } from './dto/createPost.swagger';
 import {
   FileFieldsInterceptor,
   FileInterceptor,
 } from '@nestjs/platform-express';
 import { CreatePostDto } from './dto/createPost.dto';
-import { CloudinaryService } from '@project/lib/cloudinary/cloudinary.service';
+import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
 import { CreatePostService } from './service/create-post.service';
 import { UpdatePostService } from './service/update-post.service';
 import { UpdatePostDto } from './dto/updatePost.dto';
 import { updatePostSwaggerSchema } from './dto/updatePost.swagger';
-import { AppError } from '@project/common/error/handle-error.app';
+import { AppError } from 'src/common/error/handle-error.app';
 import { PostsService } from './service/getmypost.service';
 import { DeletePostService } from './service/delete-post.service';
 import { GetAllPostsDto } from './dto/getPost.dto';
+import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
 
 @ApiTags('Writer ---')
 @Controller('writer/post')
@@ -140,6 +141,7 @@ export class WriterController {
     return this.updatePostService.updatePost(
       postId,
       dto,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       uploadedUrl?.url || undefined,
       userId,
     );

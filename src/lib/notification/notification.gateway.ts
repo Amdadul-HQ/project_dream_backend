@@ -8,8 +8,8 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { ENVEnum } from '@project/common/enum/env.enum';
-import { UserTokenPayload } from '@project/common/jwt/jwt.interface';
+import { ENVEnum } from 'src/common/enum/env.enum';
+import { UserTokenPayload } from 'src/common/jwt/jwt.interface';
 import { IncomingMessage } from 'http';
 import { Server, WebSocket } from 'ws';
 

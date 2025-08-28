@@ -8,16 +8,16 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
-import { PrismaService } from '@project/lib/prisma/prisma.service';
+import { PrismaService } from 'src/lib/prisma/prisma.service';
 import { RegisterUserDto } from './dto/auth.dto';
 import { LoginDto } from './dto/login.dto';
-import { UtilsService } from '@project/lib/utils/utils.service';
-import { successResponse } from '@project/common/utils/response.util';
+import { UtilsService } from 'src/lib/utils/utils.service';
+import { successResponse } from 'src/common/utils/response.util';
 import { google, oauth2_v2 } from 'googleapis';
 import { Credentials } from 'google-auth-library';
-// import { AppError } from '@project/common/error/handle-error.app';
-// import { CloudinaryService } from '@project/lib/cloudinary/cloudinary.service';
-// import { HandleError } from '@project/common/error/handle-error.decorator';
+// import { AppError } from 'src/common/error/handle-error.app';
+// import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
+// import { HandleError } from 'src/common/error/handle-error.decorator';
 // import { OAuth2Client } from 'google-auth-library';
 @Injectable()
 export class AuthService {

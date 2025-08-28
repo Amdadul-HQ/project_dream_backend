@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ValidateAdmin } from '@project/common/jwt/jwt.decorator';
+import { ValidateAdmin } from 'src/common/jwt/jwt.decorator';
 import { PostCategoryService } from './service/post-category.service';
 import { CreatePostCategoryDto } from './dto/createPostCategory.dto';
 

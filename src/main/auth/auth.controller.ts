@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Body,
   Controller,
@@ -10,7 +12,7 @@ import { AuthService } from './auth.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { registerUserSwaggerSchema } from './dto/registration.swagger';
 import { RegisterUserDto } from './dto/auth.dto';
-import { CloudinaryService } from '@project/lib/cloudinary/cloudinary.service';
+import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
 import { LoginDto } from './dto/login.dto';
 import { GoogleLoginDto } from './dto/googleLogin.dto';
 

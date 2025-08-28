@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { AllPostService } from './service/all-post.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { GetUser, ValidateAdmin } from '@project/common/jwt/jwt.decorator';
+import { GetUser, ValidateAdmin } from 'src/common/jwt/jwt.decorator';
 import { GetAllPostsDto } from './dto/getAllPost.dto';
 import { ReportService } from './service/report.service';
 

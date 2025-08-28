@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Audio } from '@prisma/client';
-import { ENVEnum } from '@project/common/enum/env.enum';
+import { ENVEnum } from 'src/common/enum/env.enum';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';

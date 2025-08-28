@@ -16,7 +16,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { GetUser, ValidateAuth } from '@project/common/jwt/jwt.decorator';
+import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
 import { PrivateChatService } from './private-chat.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SendPrivateMessageDto } from './dto/privateChatGateway.dto';

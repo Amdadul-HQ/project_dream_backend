@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'; // ← import your file service
 import { PrivateMessage } from '@prisma/client';
-import { PrismaService } from '@project/lib/prisma/prisma.service';
-import { FileService } from '@project/lib/utils/file.service';
+import { PrismaService } from 'src/lib/prisma/prisma.service';
+import { FileService } from 'src/lib/utils/file.service';
 import { SendPrivateMessageDto } from './dto/privateChatGateway.dto';
 
 @Injectable()

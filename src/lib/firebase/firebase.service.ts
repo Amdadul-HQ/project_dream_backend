@@ -1,6 +1,6 @@
 // import { Injectable, OnModuleInit } from '@nestjs/common';
 // import { ConfigService } from '@nestjs/config';
-// import { ENVEnum } from '@project/common/enum/env.enum';
+// import { ENVEnum } from 'src/common/enum/env.enum';
 // import chalk from 'chalk';
 // import * as admin from 'firebase-admin';
 

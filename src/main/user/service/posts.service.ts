@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Post } from '@prisma/client';
 import { PostFeedQueryDto } from '../dto/postFeedQuery.dto';
-import { PrismaService } from '@project/lib/prisma/prisma.service';
+import { PrismaService } from 'src/lib/prisma/prisma.service';
 
 @Injectable()
 export class PostsService {

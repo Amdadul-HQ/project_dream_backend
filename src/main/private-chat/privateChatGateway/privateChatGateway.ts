@@ -10,7 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import * as jwt from 'jsonwebtoken';
 import { ConfigService } from '@nestjs/config';
-import { ENVEnum } from '@project/common/enum/env.enum';
+import { ENVEnum } from 'src/common/enum/env.enum';
 import { PrivateChatService } from '../private-chat.service';
 import { SendPrivateMessageDto } from '../dto/privateChatGateway.dto';
 

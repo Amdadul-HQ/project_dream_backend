@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DashboardStatsDto } from '../dto/dashboardStats.dto';
-import { PrismaService } from '@project/lib/prisma/prisma.service';
-import { successResponse } from '@project/common/utils/response.util';
+import { PrismaService } from 'src/lib/prisma/prisma.service';
+import { successResponse } from 'src/common/utils/response.util';
 
 @Injectable()
 export class DashboardService {

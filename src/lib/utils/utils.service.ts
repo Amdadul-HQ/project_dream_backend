@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { ENVEnum } from '@project/common/enum/env.enum';
-import { AppError } from '@project/common/error/handle-error.app';
-import { JWTPayload } from '@project/common/jwt/jwt.interface';
 import * as bcrypt from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../prisma/prisma.service';
+import { AppError } from 'src/common/error/handle-error.app';
+import { JWTPayload } from 'src/common/jwt/jwt.interface';
+import { ENVEnum } from 'src/common/enum/env.enum';
 
 @Injectable()
 export class UtilsService {
@@ -75,23 +75,22 @@ export class UtilsService {
   }
 
   async hashPassword({
-        password,
-        round = 6
-    }: {
-        password: string,
-        round?: number
-    }): Promise<string> {
-        return bcrypt.hash(password, round);
-    }
+    password,
+    round = 6,
+  }: {
+    password: string;
+    round?: number;
+  }): Promise<string> {
+    return bcrypt.hash(password, round);
+  }
 
   async comparePassword({
-        hashedPassword,
-        password
-    }: {
-        password: string,
-        hashedPassword: string
-    }): Promise<boolean> {
-        return bcrypt.compare(password, hashedPassword);
-    }
-
+    hashedPassword,
+    password,
+  }: {
+    password: string;
+    hashedPassword: string;
+  }): Promise<boolean> {
+    return bcrypt.compare(password, hashedPassword);
+  }
 }

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { HandleError } from '@project/common/error/handle-error.decorator';
-import { PrismaService } from '@project/lib/prisma/prisma.service';
+import { HandleError } from 'src/common/error/handle-error.decorator';
+import { PrismaService } from 'src/lib/prisma/prisma.service';
 import { CreatePostCategoryDto } from '../dto/createPostCategory.dto';
-import { successResponse } from '@project/common/utils/response.util';
+import { successResponse } from 'src/common/utils/response.util';
 
 @Injectable()
 export class PostCategoryService {

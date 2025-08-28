@@ -8,7 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { GetUser, ValidateAuth } from '@project/common/jwt/jwt.decorator';
+import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
 import { LikeService } from './service/like.service';
 import { CommentService } from './service/comment.service';
 import { FollowService } from './service/follow.service';
