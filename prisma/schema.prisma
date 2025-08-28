@@ -1,0 +1,310 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model 
+model User {
+  id              String           @id @default(uuid())
+  name            String
+  phone           String?
+  email           String           @unique
+  address         String?
+  profile         String?
+  isVerified      Boolean          @default(false)
+  role            Role             @default(USER)
+  isGoogle        Boolean          @default(false)
+  status          UserStatus       @default(Active)
+
+  socialMedia     UserSocialMedia?
+  likedPost       Post[]
+  posts           Post[]           @relation(name: "writer")
+  commentsPost    Comment[]
+
+  // 👇 Follower system
+  followers       Follow[]         @relation("Followee")
+  following       Follow[]         @relation("Follower")
+  Auth            Auth[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+
+  report        Report[] @relation("Reporter")
+
+  PrivateMessageStatus PrivateMessageStatus[]
+
+  privateConversation1 PrivateConversation[]     @relation("User1Conversations")
+  privateConversation2 PrivateConversation[]     @relation("User2Conversations")
+
+  privateMessage PrivateMessage[]
+}
+
+// auth module
+model Auth {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  name            String
+  password        String
+  role            Role
+  userId          String           @unique
+  user            User?            @relation(fields: [userId], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// follwer system model
+model Follow {
+  id              String           @id @default(uuid())
+
+  followerId      String
+  followeeId      String
+
+  follower        User             @relation("Follower", fields: [followerId], references: [id])
+  followee        User             @relation("Followee", fields: [followeeId], references: [id])
+
+  createdAt       DateTime         @default(now())
+
+  @@unique([followerId, followeeId]) // prevent duplicate follows
+}
+
+// user role enum
+enum Role {
+  USER
+  WRITER
+  ADMIN
+}
+
+// User Socal media 
+model UserSocialMedia {
+  id              String           @id @default(uuid())
+  userId          String           @unique
+  facebook        String?
+  youtube         String?
+  twitter         String?
+  instagram       String?
+  pinterest       String?
+  linkedin        String?
+  tiktok          String?
+
+  user            User             @relation(fields: [userId], references: [id])
+
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+
+// user status
+enum UserStatus {
+  Active
+  Blocked
+  Ban
+  Suspened
+}
+
+// Post model
+model Post {
+  id            String           @id @default(uuid())
+
+  seriesId      String?
+  series        Series?          @relation(fields: [seriesId], references: [id])
+  
+  thumbnail     String 
+
+  part          Int?             @unique
+
+  categories    Category[]
+
+  writerId      String
+  writer        User           @relation(name: "writer", fields: [writerId], references: [id])
+
+  title         String
+  content       Json
+  likeCount     Int              @default(0)
+  commentCount  Int              @default(0)
+  viewsCount    Int              @default(0)
+
+  like          User[]
+  comments      Comment[]
+
+  status        PostStatus       @default(PUBLISHED)
+  audio         Audio?
+  reports       Report[]         @relation("ReportedPost")
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+}
+
+// Post Status
+enum PostStatus {
+  REPORTED
+  PUBLISHED
+  UNDER_REVIEW
+  DELETED
+  HOLD
+}
+
+// File Type enum
+model FileInstance {
+  id                 String          @id @default(uuid())
+  createdAt          DateTime        @default(now())
+  filename           String
+  originalFilename   String
+  path               String
+  url                String
+  fileType           FileType
+  mimeType           String
+  size               Int
+}
+
+enum FileType {
+    image
+    docs
+    link
+}
+
+// comment model
+model Comment {
+  id        String    @id @default(uuid())
+  postId    String
+  userId    String
+  comment   String
+  parentId  String?   // For replies
+  post      Post      @relation(fields: [postId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+
+// Serise Model
+model Series {
+  id        String      @id @default(uuid())
+  name      String      @unique
+  
+  // A series can have many posts
+  posts     Post[]
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  audio     Audio[]
+}
+
+
+// Category model
+model Category {
+  id      String      @id   @default(uuid())
+  name    String      @unique
+  
+  // A category can have many posts
+  posts   Post[]
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Audio {
+  id               String      @id @default(uuid())
+  postId           String      @unique
+  seriesId         String?     // Optional, as not all posts may belong to a series
+
+  post             Post        @relation(fields: [postId], references: [id])
+  series           Series?     @relation(fields: [seriesId], references: [id])
+
+  part             Int?        // Optional tracking of the series part
+  filename         String
+  originalFilename String
+  path             String
+  url              String
+  mimeType         String
+  size             Int
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+// New model for reporting posts
+model Report {
+  id            String          @id @default(uuid())
+  postId        String
+  post          Post            @relation("ReportedPost", fields: [postId], references: [id])
+  reporterId    String
+  reporter      User            @relation("Reporter", fields: [reporterId], references: [id])
+  reason        String
+  status        ReportStatus    @default(PENDING)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+
+// Status for a report
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model PrivateMessage {
+  id             String  @id @default(uuid())
+  content        String
+  conversationId String
+  senderId       String
+  fileId         String?
+
+  // file         FileInstance?       @relation(fields: [fileId], references: [id])
+  conversation PrivateConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  statuses  PrivateMessageStatus[]
+  createdAt DateTime               @default(now())
+}
+
+model PrivateConversation {
+  id      String @id @default(uuid())
+  user1Id String
+  user2Id String
+
+  user1 User @relation("User1Conversations", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2 User @relation("User2Conversations", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  messages  PrivateMessage[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([user1Id, user2Id]) // prevent duplicates (A-B same as B-A)
+}
+
+model PrivateMessageStatus {
+  id        String                @id @default(uuid())
+  messageId String
+  userId    String
+  status    MessageDeliveryStatus
+  updatedAt DateTime              @updatedAt
+
+  message PrivateMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+
+enum MessageDeliveryStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+
