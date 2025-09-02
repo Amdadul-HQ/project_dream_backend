@@ -51,6 +51,15 @@ model User {
   userMonthlyStats UserMonthlyStats[]
 
   userContentStats UserContentStats?
+
+
+  // FollowHistory FollowHistory[] @relation("FollowHistoryFollower")
+
+  UserGrowthStats UserGrowthStats[]
+
+  FollowHistory FollowHistory[] @relation("FollowHistoryUser")
+
+  FollowerHistory FollowHistory[] @relation("FollowHistoryFollower")
 }
 
 // auth module
@@ -210,6 +219,50 @@ model UserContentStats {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+// Track follow & unfollow history
+model FollowHistory {
+  id           String   @id @default(uuid())
+  userId       String   // the user being followed/unfollowed
+  followerId   String   // the user who followed/unfollowed
+  action       FollowAction
+  createdAt    DateTime @default(now())
+
+  user         User     @relation("FollowHistoryUser", fields: [userId], references: [id], onDelete: Cascade)
+  follower     User     @relation("FollowHistoryFollower", fields: [followerId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([followerId, createdAt])
+}
+
+enum FollowAction {
+  FOLLOW
+  UNFOLLOW
+}
+
+// Daily/weekly/monthly snapshots (aggregated growth stats)
+model UserGrowthStats {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date           DateTime // store daily snapshots, you can aggregate to week/month
+
+  followersCount Int
+  followingCount Int
+  postsCount     Int
+  likesCount     Int
+  commentsCount  Int
+  viewsCount     Int
+
+  followerRatio  Float?   // followersCount / followingCount
+  growthRate     Float?   // percentage change compared to last snapshot
+
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, date]) // ensure one record per user per day
+}
+
 
 
 // Post Status
