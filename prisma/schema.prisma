@@ -47,6 +47,8 @@ model User {
   privateMessage PrivateMessage[]
 
   userOverview UserOverview?
+
+  userMonthlyStats UserMonthlyStats[]
 }
 
 // auth module
@@ -166,6 +168,27 @@ model UserOverview {
   updatedAt        DateTime  @updatedAt
 }
 
+// Historical stats: stored per user per month
+model UserMonthlyStats {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  year             Int
+  month            Int // 1–12
+
+  followersCount   Int      @default(0)
+  postsCount       Int      @default(0)
+  likesCount       Int      @default(0)
+  commentsCount    Int      @default(0)
+  viewsCount       Int      @default(0)
+  engagementRate   Float    @default(0.0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, year, month]) // ensure one record per month per user
+}
 
 
 // Post Status
