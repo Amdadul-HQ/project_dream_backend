@@ -45,6 +45,8 @@ model User {
   privateConversation2 PrivateConversation[]     @relation("User2Conversations")
 
   privateMessage PrivateMessage[]
+
+  userOverview UserOverview?
 }
 
 // auth module
@@ -122,6 +124,7 @@ model Post {
   part          Int?             @unique
 
   categories    Category[]
+  tags          String[]
 
   writerId      String
   writer        User           @relation(name: "writer", fields: [writerId], references: [id])
@@ -143,6 +146,27 @@ model Post {
   updatedAt     DateTime         @updatedAt
 
 }
+
+model UserOverview {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalFollowers   Int       @default(0)   // total number of followers
+  totalPosts       Int       @default(0)   // total number of posts
+  totalViews       Int       @default(0)   // total number of views across posts
+  engagementRate   Float     @default(0.0) // engagement percentage
+
+  followerGrowth   Float?    // percentage change from last month
+  postGrowth       Float?    // number of new posts this month
+  viewGrowth       Float?    // percentage change from last month
+  engagementGrowth Float?    // percentage change from last month
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+
 
 // Post Status
 enum PostStatus {
