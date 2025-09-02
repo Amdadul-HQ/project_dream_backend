@@ -49,6 +49,8 @@ model User {
   userOverview UserOverview?
 
   userMonthlyStats UserMonthlyStats[]
+
+  userContentStats UserContentStats?
 }
 
 // auth module
@@ -191,6 +193,25 @@ model UserMonthlyStats {
 }
 
 
+model UserContentStats {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalPosts      Int      @default(0)
+  avgViews        Float    @default(0.0)   // average views per post
+  avgEngagement   Float    @default(0.0)   // average engagement rate across posts
+
+  topCategoryId   String?  
+  topCategory     Category? @relation(fields: [topCategoryId], references: [id])
+
+  topCategoryRate Float?   // percentage of posts in top category (e.g., 32%)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+
 // Post Status
 enum PostStatus {
   REPORTED
@@ -261,6 +282,8 @@ model Category {
 
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+
+  userContentStats UserContentStats[]
 }
 
 model Audio {
