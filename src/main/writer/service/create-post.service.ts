@@ -12,12 +12,8 @@ export class CreatePostService {
   ) {}
 
   /**
-   * Creates a new post.
-   * If a seriesName is provided, a new series is created first within a transaction.
-   * If a seriesId is provided, the post is added to the existing series.
-   * A unique part number is automatically assigned within the series.
-   * @param createPostDto The DTO for post creation.
-   * @returns The newly created Post object.
+   * Creates a new post with optional series and audio.
+   * Handles part numbering inside a series.
    */
   async createPost(
     createPostDto: CreatePostDto,
@@ -30,9 +26,9 @@ export class CreatePostService {
     let postSeriesId: string | undefined;
     let nextPartNumber: number | undefined;
 
-    // First, create the post and related entities inside a transaction
+    // Wrap inside transaction
     const createdPost = await this.prisma.$transaction(async (tx) => {
-      // Handle series creation or connection
+      // --- Handle series ---
       if (seriesname) {
         if (seriesId) {
           throw new BadRequestException(
@@ -53,8 +49,10 @@ export class CreatePostService {
         postSeriesId = seriesId;
       }
 
-      const categoriesToConnect = categoryIds.map((id) => ({ id }));
+      // --- Categories ---
+      const categoriesToConnect = categoryIds?.map((id) => ({ id })) ?? [];
 
+      // --- Create Post ---
       return await tx.post.create({
         data: {
           ...postData,
@@ -67,7 +65,7 @@ export class CreatePostService {
       });
     });
 
-    // ✅ Now outside the transaction — post is committed, postId is safe to use
+    // --- Handle audio after post creation ---
     if (audio) {
       try {
         await this.cloudinaryService.processUploadedAudio(
@@ -76,9 +74,23 @@ export class CreatePostService {
           postSeriesId,
           nextPartNumber,
         );
+
+        // Ensure audio is linked in DB (Audio model requires postId unique)
+        await this.prisma.audio.create({
+          data: {
+            postId: createdPost.id,
+            seriesId: postSeriesId,
+            part: nextPartNumber,
+            filename: audio.filename,
+            originalFilename: audio.originalname,
+            path: audio.path,
+            url: '', // cloudinaryService should return URL ideally
+            mimeType: audio.mimetype,
+            size: audio.size,
+          },
+        });
       } catch (error) {
         console.error('Error processing uploaded audio:', error);
-        // Optionally: delete the post if audio upload fails?
         throw new BadRequestException('Failed to upload audio file');
       }
     }
