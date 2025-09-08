@@ -1,115 +1,110 @@
-import {
-  WebSocketGateway,
-  WebSocketServer,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import * as jwt from 'jsonwebtoken';
-import { ConfigService } from '@nestjs/config';
-import { ENVEnum } from 'src/common/enum/env.enum';
-import { PrivateChatService } from '../private-chat.service';
-import { SendPrivateMessageDto } from '../dto/privateChatGateway.dto';
+// private-chat.service.ts
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/lib/prisma/prisma.service';
 
-@WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-  namespace: '/private',
-})
-export class PrivateChatGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
-  @WebSocketServer()
-  server: Server;
+@Injectable()
+export class PrivateChatService {
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor(
-    private readonly privateChatService: PrivateChatService,
-    private readonly configService: ConfigService,
-  ) {}
+  async findOrCreateConversation(userId: string, recipientId: string) {
+    // Ensure consistent ordering (user1Id < user2Id to prevent duplicate pairs)
+    const [firstUser, secondUser] =
+      userId < recipientId ? [userId, recipientId] : [recipientId, userId];
 
-  async handleConnection(client: Socket) {
-    const token = client.handshake.headers.authorization?.split(' ')[1];
-    if (!token) {
-      client.disconnect();
-      console.log('Missing token');
-      return;
+    let conversation = await this.prisma.privateConversation.findFirst({
+      where: {
+        OR: [
+          { user1Id: firstUser, user2Id: secondUser },
+          { user1Id: secondUser, user2Id: firstUser },
+        ],
+      },
+    });
+
+    if (!conversation) {
+      conversation = await this.prisma.privateConversation.create({
+        data: {
+          user1Id: firstUser,
+          user2Id: secondUser,
+        },
+      });
     }
 
-    try {
-      const jwtSecret = this.configService.get<string>(ENVEnum.JWT_SECRET);
-      const payload: any = jwt.verify(token, jwtSecret as string);
-      const userId = payload.sub;
-
-      client.data.userId = userId;
-      client.join(userId);
-
-      console.log(
-        `Private chat: User ${userId} connected, socket ${client.id}`,
-      );
-    } catch (err) {
-      client.disconnect();
-      console.log(`Authentication failed: ${err.message}`);
-    }
+    return conversation;
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`Private chat disconnected: ${client.id}`);
-  }
-
-  @SubscribeMessage('private:send_message')
-  async handleMessage(
-    @MessageBody()
-    payload: {
-      recipientId: string;
-      dto: SendPrivateMessageDto;
-      file?: Express.Multer.File;
-      userId: string;
-    },
-    @ConnectedSocket() client: Socket,
+  async sendPrivateMessage(
+    conversationId: string,
+    senderId: string,
+    dto: { content: string },
+    fileId?: string,
   ) {
-    const { recipientId, dto, file, userId } = payload;
-    console.log(payload, 'payload');
-    // Validate sender matches token
-    if (client.data.userId !== userId) {
-      console.log(client, 'client');
-      console.log(
-        `User ID mismatch: client ${client.data.userId} vs payload ${userId}`,
-      );
-      return;
-    }
+    const message = await this.prisma.privateMessage.create({
+      data: {
+        content: dto.content,
+        conversationId,
+        senderId,
+        fileId,
+        statuses: {
+          create: [
+            {
+              userId: senderId,
+              status: 'SENT',
+            },
+          ],
+        },
+      },
+      include: {
+        statuses: true,
+      },
+    });
 
-    // Prevent sending to self
-    if (userId === recipientId) {
-      console.log('hello');
-      console.log(`User ${userId} cannot send message to themselves`);
-      return;
-    }
+    return message;
+  }
 
-    // Get or create conversation
-    const conversation = await this.privateChatService.findOrCreateConversation(
+  /**
+   * Load chat messages between two users with pagination
+   */
+  async loadChatHistory(
+    userId: string,
+    recipientId: string,
+    limit = 20,
+    cursor?: string,
+  ) {
+    const conversation = await this.findOrCreateConversation(
       userId,
       recipientId,
     );
 
-    // Send message
-    const message = await this.privateChatService.sendPrivateMessage(
-      conversation.id,
-      userId,
-      dto,
-      file,
-    );
+    const messages = await this.prisma.privateMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+      skip: cursor ? 1 : 0,
+      ...(cursor
+        ? {
+            cursor: { id: cursor },
+          }
+        : {}),
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            profile: true,
+          },
+        },
+        statuses: true,
+      },
+    });
 
-    // Emit to both users
-    this.server.to(userId).emit('private:new_message', message);
-    console.log(message, '<=message', recipientId, '<=reciver id');
-    this.server.to(recipientId).emit('private:new_message', message);
-  }
-
-  emitNewMessage(userId: string, message: any) {
-    this.server.to(userId).emit('private:new_message', message);
+    return {
+      conversationId: conversation.id,
+      messages: messages.reverse(), // oldest first for UI
+      nextCursor: messages.length > 0 ? messages[messages.length - 1].id : null,
+    };
   }
 }
