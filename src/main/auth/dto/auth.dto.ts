@@ -4,7 +4,6 @@ import {
   IsEmail,
   IsNotEmpty,
   IsOptional,
-  IsPhoneNumber,
   IsString,
   Length,
 } from 'class-validator';
@@ -34,10 +33,14 @@ export class RegisterUserDto {
     required: true,
   })
   @IsString()
-  @IsPhoneNumber()
   phone: string;
 
+  @ApiProperty({
+    description: 'User Address',
+    example: '123 Main St, City, Country',
+  })
   @IsString()
+  @IsOptional()
   address: string;
 
   @ApiProperty({
