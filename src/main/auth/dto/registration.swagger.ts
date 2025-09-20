@@ -52,5 +52,5 @@ export const registerUserSwaggerSchema = {
       example: 'https://tiktok.com/@johndoe',
     },
   },
-  required: ['name', 'email', 'phone', 'address', 'password', 'profile'],
+  required: ['name', 'email', 'password'],
 };

@@ -33,7 +33,7 @@ export class RegisterUserDto {
     required: true,
   })
   @IsString()
-  phone: string;
+  phone?: string;
 
   @ApiProperty({
     description: 'User Address',
@@ -41,7 +41,7 @@ export class RegisterUserDto {
   })
   @IsString()
   @IsOptional()
-  address: string;
+  address?: string;
 
   @ApiProperty({
     description: 'User password',

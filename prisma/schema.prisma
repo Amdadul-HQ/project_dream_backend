@@ -10,96 +10,107 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User Model 
+// =============================================
+// CORE USER & AUTH MODELS
+// =============================================
+
 model User {
-  id              String           @id @default(uuid())
+  id              String           @id @default(cuid())
+  username        String           @unique
   name            String
   phone           String?
   email           String           @unique
   address         String?
   profile         String?
+  bio             String?
   isVerified      Boolean          @default(false)
   role            Role             @default(USER)
   isGoogle        Boolean          @default(false)
   status          UserStatus       @default(Active)
+  lastActiveAt    DateTime         @default(now())
 
+  // Relations
   socialMedia     UserSocialMedia?
-  likedPost       Post[]
-  posts           Post[]           @relation(name: "writer")
-  commentsPost    Comment[]
-
-  // 👇 Follower system
+  posts           Post[]           @relation(name: "PostAuthor")
+  likedPosts      PostLike[]
+  comments        Comment[]
+  savedPosts      SavedPost[]
+  
+  // Follower system
   followers       Follow[]         @relation("Followee")
   following       Follow[]         @relation("Follower")
-  Auth            Auth[]
+  
+  // Authentication
+  auth            Auth?
+  
+  // Messaging
+  sentMessages        PrivateMessage[]     @relation("MessageSender")
+  receivedMessages    PrivateMessage[]     @relation("MessageReceiver")
+  messageStatuses     PrivateMessageStatus[]
+  conversations       ConversationMember[]
+  
+  // Notifications & Activity
+  sentNotifications   Notification[]       @relation("NotificationSender")
+  receivedNotifications Notification[]     @relation("NotificationReceiver")
+  activities          RecentActivity[]
+  
+  // Reports
+  reportsMade     Report[]         @relation("Reporter")
+  reportsReceived Report[]         @relation("ReportedUser")
+  
+  // Analytics
+  userStats       UserStats?
+  monthlyStats    UserMonthlyStats[]
+  growthStats     UserGrowthStats[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-
-  report        Report[] @relation("Reporter")
-
-  PrivateMessageStatus PrivateMessageStatus[]
-
-  privateConversation1 PrivateConversation[]     @relation("User1Conversations")
-  privateConversation2 PrivateConversation[]     @relation("User2Conversations")
-
-  privateMessage PrivateMessage[]
-
-  userOverview UserOverview?
-
-  userMonthlyStats UserMonthlyStats[]
-
-  userContentStats UserContentStats?
-
-
-  // FollowHistory FollowHistory[] @relation("FollowHistoryFollower")
-
-  UserGrowthStats UserGrowthStats[]
-
-  FollowHistory FollowHistory[] @relation("FollowHistoryUser")
-
-  FollowerHistory FollowHistory[] @relation("FollowHistoryFollower")
+  // Indexes for performance
+  @@index([email])
+  @@index([username])
+  @@index([status])
+  @@index([lastActiveAt])
+  @@index([createdAt])
 }
 
-// auth module
 model Auth {
-  id              String           @id @default(uuid())
+  id              String           @id @default(cuid())
   email           String           @unique
-  name            String
-  password        String
-  role            Role
+  password        String?
+  refreshToken    String?
+  lastLoginAt     DateTime?
+  loginAttempts   Int              @default(0)
+  lockedUntil     DateTime?
+  
   userId          String           @unique
-  user            User?            @relation(fields: [userId], references: [id])
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+
+  @@index([email])
+  @@index([refreshToken])
 }
 
-// follwer system model
 model Follow {
-  id              String           @id @default(uuid())
-
+  id              String           @id @default(cuid())
   followerId      String
   followeeId      String
-
-  follower        User             @relation("Follower", fields: [followerId], references: [id])
-  followee        User             @relation("Followee", fields: [followeeId], references: [id])
-
+  
+  follower        User             @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee        User             @relation("Followee", fields: [followeeId], references: [id], onDelete: Cascade)
+  
   createdAt       DateTime         @default(now())
 
-  @@unique([followerId, followeeId]) // prevent duplicate follows
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
+  @@index([createdAt])
 }
 
-// user role enum
-enum Role {
-  USER
-  WRITER
-  ADMIN
-}
-
-// User Socal media 
 model UserSocialMedia {
-  id              String           @id @default(uuid())
+  id              String           @id @default(cuid())
   userId          String           @unique
   facebook        String?
   youtube         String?
@@ -109,325 +120,513 @@ model UserSocialMedia {
   linkedin        String?
   tiktok          String?
 
-  user            User             @relation(fields: [userId], references: [id])
-
-
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
 
+// =============================================
+// BLOG CONTENT MODELS
+// =============================================
 
-// user status
-enum UserStatus {
-  Active
-  Blocked
-  Ban
-  Suspened
-}
-
-// Post model
 model Post {
-  id            String           @id @default(uuid())
-
-  seriesId      String?
-  series        Series?          @relation(fields: [seriesId], references: [id])
+  id              String           @id @default(cuid())
+  slug            String           @unique
+  title           String
+  content         Json
+  excerpt         String?          // For SEO and previews
+  thumbnail       String?
+  audioUrl        String?
   
-  thumbnail     String 
+  authorId        String
+  author          User             @relation(name: "PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  seriesId        String?
+  series          Series?          @relation(fields: [seriesId], references: [id])
+  seriesOrder     Int?             // Order within series
+  
+  categories      PostCategory[]
+  tags            PostTag[]
+  
+  // Engagement
+  likes           PostLike[]
+  comments        Comment[]
+  saves           SavedPost[]
+  
+  // Analytics
+  viewsCount      Int              @default(0)
+  likeCount       Int              @default(0)
+  commentCount    Int              @default(0)
+  shareCount      Int              @default(0)
+  
+  // Status & Publishing
+  status          PostStatus       @default(DRAFT)
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  
+  // Reports
+  reports         Report[]         @relation("ReportedPost")
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  part          Int?             @unique
-
-  categories    Category[]
-  tags          String[]
-
-  writerId      String
-  writer        User           @relation(name: "writer", fields: [writerId], references: [id])
-
-  title         String
-  content       Json
-  likeCount     Int              @default(0)
-  commentCount  Int              @default(0)
-  viewsCount    Int              @default(0)
-
-  like          User[]
-  comments      Comment[]
-
-  status        PostStatus       @default(PUBLISHED)
-  audio         Audio?
-  reports       Report[]         @relation("ReportedPost")
-
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
+  @@index([authorId])
+  @@index([seriesId])
+  @@index([status])
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@index([likeCount])
+  @@index([viewsCount])
+  @@index([slug])
 }
 
-model UserOverview {
-  id               String    @id @default(uuid())
-  userId           String    @unique
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Series {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  description     String?
+  thumbnail       String?
+  
+  posts           Post[]
+  postsCount      Int              @default(0)
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  totalFollowers   Int       @default(0)   // total number of followers
-  totalPosts       Int       @default(0)   // total number of posts
-  totalViews       Int       @default(0)   // total number of views across posts
-  engagementRate   Float     @default(0.0) // engagement percentage
-
-  followerGrowth   Float?    // percentage change from last month
-  postGrowth       Float?    // number of new posts this month
-  viewGrowth       Float?    // percentage change from last month
-  engagementGrowth Float?    // percentage change from last month
-
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  @@index([slug])
+  @@index([createdAt])
 }
 
-// Historical stats: stored per user per month
-model UserMonthlyStats {
-  id               String   @id @default(uuid())
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Category {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  description     String?
+  color           String?          // For UI theming
+  
+  posts           PostCategory[]
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  year             Int
-  month            Int // 1–12
-
-  followersCount   Int      @default(0)
-  postsCount       Int      @default(0)
-  likesCount       Int      @default(0)
-  commentsCount    Int      @default(0)
-  viewsCount       Int      @default(0)
-  engagementRate   Float    @default(0.0)
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@unique([userId, year, month]) // ensure one record per month per user
+  @@index([slug])
 }
 
+model Tag {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  
+  posts           PostTag[]
+  usageCount      Int              @default(0)
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-model UserContentStats {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  totalPosts      Int      @default(0)
-  avgViews        Float    @default(0.0)   // average views per post
-  avgEngagement   Float    @default(0.0)   // average engagement rate across posts
-
-  topCategoryId   String?  
-  topCategory     Category? @relation(fields: [topCategoryId], references: [id])
-
-  topCategoryRate Float?   // percentage of posts in top category (e.g., 32%)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  @@index([slug])
+  @@index([usageCount])
 }
 
-// Track follow & unfollow history
-model FollowHistory {
-  id           String   @id @default(uuid())
-  userId       String   // the user being followed/unfollowed
-  followerId   String   // the user who followed/unfollowed
-  action       FollowAction
-  createdAt    DateTime @default(now())
+// Junction tables for many-to-many relationships
+model PostCategory {
+  postId          String
+  categoryId      String
+  
+  post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category        Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  user         User     @relation("FollowHistoryUser", fields: [userId], references: [id], onDelete: Cascade)
-  follower     User     @relation("FollowHistoryFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  @@id([postId, categoryId])
+}
+
+model PostTag {
+  postId          String
+  tagId           String
+  
+  post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag             Tag              @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+}
+
+// =============================================
+// ENGAGEMENT MODELS
+// =============================================
+
+model PostLike {
+  id              String           @id @default(cuid())
+  userId          String
+  postId          String
+  
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime         @default(now())
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id              String           @id @default(cuid())
+  content         String
+  
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  postId          String
+  post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  parentId        String?
+  parent          Comment?         @relation("CommentReplies", fields: [parentId], references: [id])
+  replies         Comment[]        @relation("CommentReplies")
+  
+  likeCount       Int              @default(0)
+  replyCount      Int              @default(0)
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([postId])
+  @@index([userId])
+  @@index([parentId])
+  @@index([createdAt])
+}
+
+model SavedPost {
+  id              String           @id @default(cuid())
+  userId          String
+  postId          String
+  
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime         @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================
+// NOTIFICATION SYSTEM
+// =============================================
+
+model Notification {
+  id              String           @id @default(cuid())
+  type            NotificationType
+  title           String
+  content         String?
+  
+  senderId        String?          // Optional: who triggered the notification
+  sender          User?            @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+  
+  receiverId      String
+  receiver        User             @relation("NotificationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  // Related entities
+  postId          String?
+  commentId       String?
+  followId        String?
+  
+  // Metadata
+  data            Json?            // Additional data as needed
+  
+  // Status
+  isRead          Boolean          @default(false)
+  readAt          DateTime?
+  
+  createdAt       DateTime         @default(now())
+
+  @@index([receiverId, isRead])
+  @@index([receiverId, createdAt])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// =============================================
+// RECENT ACTIVITY TRACKING
+// =============================================
+
+model RecentActivity {
+  id              String           @id @default(cuid())
+  type            ActivityType
+  description     String
+  
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Related entities
+  targetId        String?          // ID of the target entity (post, user, etc.)
+  targetType      String?          // Type of target entity
+  
+  // Metadata
+  metadata        Json?            // Additional activity data
+  
+  createdAt       DateTime         @default(now())
 
   @@index([userId, createdAt])
-  @@index([followerId, createdAt])
+  @@index([type])
+  @@index([createdAt])
 }
 
-enum FollowAction {
-  FOLLOW
-  UNFOLLOW
-}
+// =============================================
+// MESSAGING SYSTEM
+// =============================================
 
-// Daily/weekly/monthly snapshots (aggregated growth stats)
-model UserGrowthStats {
-  id             String   @id @default(uuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  date           DateTime // store daily snapshots, you can aggregate to week/month
-
-  followersCount Int
-  followingCount Int
-  postsCount     Int
-  likesCount     Int
-  commentsCount  Int
-  viewsCount     Int
-
-  followerRatio  Float?   // followersCount / followingCount
-  growthRate     Float?   // percentage change compared to last snapshot
-
-  createdAt      DateTime @default(now())
-
-  @@unique([userId, date]) // ensure one record per user per day
-}
-
-
-
-// Post Status
-enum PostStatus {
-  REPORTED
-  PUBLISHED
-  UNDER_REVIEW
-  DELETED
-  HOLD
-}
-
-// File Type enum
-model FileInstance {
-  id                 String          @id @default(uuid())
-  createdAt          DateTime        @default(now())
-  filename           String
-  originalFilename   String
-  path               String
-  url                String
-  fileType           FileType
-  mimeType           String
-  size               Int
-}
-
-enum FileType {
-    image
-    docs
-    link
-}
-
-// comment model
-model Comment {
-  id        String    @id @default(uuid())
-  postId    String
-  userId    String
-  comment   String
-  parentId  String?   // For replies
-  post      Post      @relation(fields: [postId], references: [id])
-  user      User      @relation(fields: [userId], references: [id])
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies   Comment[] @relation("CommentReplies")
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-
-// Serise Model
-model Series {
-  id        String      @id @default(uuid())
-  name      String      @unique
+model Conversation {
+  id              String           @id @default(cuid())
+  type            ConversationType @default(DIRECT)
+  name            String?          // For group conversations
   
-  // A series can have many posts
-  posts     Post[]
-
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  audio     Audio[]
-}
-
-
-// Category model
-model Category {
-  id      String      @id   @default(uuid())
-  name    String      @unique
+  members         ConversationMember[]
+  messages        PrivateMessage[]
   
-  // A category can have many posts
-  posts   Post[]
+  lastMessageAt   DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  userContentStats UserContentStats[]
+  @@index([lastMessageAt])
+  @@index([createdAt])
 }
 
-model Audio {
-  id               String      @id @default(uuid())
-  postId           String      @unique
-  seriesId         String?     // Optional, as not all posts may belong to a series
+model ConversationMember {
+  id              String           @id @default(cuid())
+  conversationId  String
+  userId          String
+  
+  conversation    Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  joinedAt        DateTime         @default(now())
+  leftAt          DateTime?
 
-  post             Post        @relation(fields: [postId], references: [id])
-  series           Series?     @relation(fields: [seriesId], references: [id])
-
-  part             Int?        // Optional tracking of the series part
-  filename         String
-  originalFilename String
-  path             String
-  url              String
-  mimeType         String
-  size             Int
-
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-}
-
-// New model for reporting posts
-model Report {
-  id            String          @id @default(uuid())
-  postId        String
-  post          Post            @relation("ReportedPost", fields: [postId], references: [id])
-  reporterId    String
-  reporter      User            @relation("Reporter", fields: [reporterId], references: [id])
-  reason        String
-  status        ReportStatus    @default(PENDING)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-}
-
-
-// Status for a report
-enum ReportStatus {
-  PENDING
-  RESOLVED
-  DISMISSED
+  @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model PrivateMessage {
-  id             String  @id @default(uuid())
-  content        String
-  conversationId String
-  senderId       String
-  fileId         String?
+  id              String           @id @default(cuid())
+  content         String
+  
+  conversationId  String
+  conversation    Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderId        String
+  sender          User             @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  receiverId      String?
+  receiver        User?            @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: SetNull)
+  
+  fileUrl         String?
+  fileType        String?
+  
+  statuses        PrivateMessageStatus[]
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  // file         FileInstance?       @relation(fields: [fileId], references: [id])
-  conversation PrivateConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
-
-  statuses  PrivateMessageStatus[]
-  createdAt DateTime               @default(now())
-}
-
-model PrivateConversation {
-  id      String @id @default(uuid())
-  user1Id String
-  user2Id String
-
-  user1 User @relation("User1Conversations", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2 User @relation("User2Conversations", fields: [user2Id], references: [id], onDelete: Cascade)
-
-  messages  PrivateMessage[]
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  @@unique([user1Id, user2Id]) // prevent duplicates (A-B same as B-A)
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([receiverId])
 }
 
 model PrivateMessageStatus {
-  id        String                @id @default(uuid())
-  messageId String
-  userId    String
-  status    MessageDeliveryStatus
-  updatedAt DateTime              @updatedAt
-
-  message PrivateMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  messageId       String
+  userId          String
+  status          MessageStatus
+  
+  message         PrivateMessage   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  updatedAt       DateTime         @updatedAt
 
   @@unique([messageId, userId])
 }
 
+// =============================================
+// ANALYTICS & STATS
+// =============================================
 
-enum MessageDeliveryStatus {
+model UserStats {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalPosts      Int              @default(0)
+  totalViews      Int              @default(0)
+  totalLikes      Int              @default(0)
+  totalComments   Int              @default(0)
+  totalFollowers  Int              @default(0)
+  totalFollowing  Int              @default(0)
+  
+  engagementRate  Float            @default(0.0)
+  avgViewsPerPost Float            @default(0.0)
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model UserMonthlyStats {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  year            Int
+  month           Int
+  
+  postsCount      Int              @default(0)
+  viewsCount      Int              @default(0)
+  likesCount      Int              @default(0)
+  commentsCount   Int              @default(0)
+  followersGained Int              @default(0)
+  
+  engagementRate  Float            @default(0.0)
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([userId, year, month])
+  @@index([userId, year, month])
+}
+
+model UserGrowthStats {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  date            DateTime         @db.Date
+  
+  followersCount  Int
+  followingCount  Int
+  postsCount      Int
+  totalViews      Int
+  totalLikes      Int
+  
+  createdAt       DateTime         @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+// =============================================
+// REPORTING SYSTEM
+// =============================================
+
+model Report {
+  id              String           @id @default(cuid())
+  type            ReportType
+  reason          String
+  description     String?
+  
+  reporterId      String
+  reporter        User             @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  // Target can be user or post
+  reportedUserId  String?
+  reportedUser    User?            @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  
+  reportedPostId  String?
+  reportedPost    Post?            @relation("ReportedPost", fields: [reportedPostId], references: [id], onDelete: Cascade)
+  
+  status          ReportStatus     @default(PENDING)
+  reviewedAt      DateTime?
+  reviewedBy      String?          // Admin user ID
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status])
+  @@index([reporterId])
+  @@index([createdAt])
+}
+
+// =============================================
+// ENUMS
+// =============================================
+
+enum Role {
+  USER
+  WRITER
+  ADMIN
+  MODERATOR
+}
+
+enum UserStatus {
+  Active
+  Inactive
+  Suspended
+  Banned
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  DELETED
+  UNDER_REVIEW
+  SCHEDULED
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  POST_LIKED
+  POST_COMMENTED
+  POST_SHARED
+  COMMENT_REPLIED
+  POST_PUBLISHED
+  SERIES_UPDATED
+  MENTION
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum ActivityType {
+  POST_CREATED
+  POST_UPDATED
+  POST_PUBLISHED
+  POST_LIKED
+  POST_COMMENTED
+  POST_SHARED
+  POST_SAVED
+  USER_FOLLOWED
+  USER_UNFOLLOWED
+  COMMENT_CREATED
+  COMMENT_LIKED
+  PROFILE_UPDATED
+  SERIES_CREATED
+  LOGIN
+  LOGOUT
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum MessageStatus {
   SENT
   DELIVERED
   READ
 }
 
+enum ReportType {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE_CONTENT
+  COPYRIGHT_VIOLATION
+  FAKE_ACCOUNT
+  OTHER
+}
 
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
