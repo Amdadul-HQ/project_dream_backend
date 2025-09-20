@@ -1,26 +1,27 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
-  Body,
   Controller,
-  Param,
   Post,
+  Param,
+  Body,
   UploadedFile,
   UseInterceptors,
-  OnModuleInit,
   Inject,
   forwardRef,
+  OnModuleInit,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiOperation,
   ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
-import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
-import { PrivateChatService } from './private-chat.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { PrivateChatService } from './private-chat.service';
 import { SendPrivateMessageDto } from './dto/privateChatGateway.dto';
 import { sendPrivateMessageSwaggerSchema } from './dto/privateChatGateway.swagger';
+import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
 import { PrivateChatGateway } from './privateChatGateway/privateChatGateway';
 
 @ApiTags('Private Chat')
@@ -41,7 +42,7 @@ export class PrivateChatController implements OnModuleInit {
   }
 
   @Post('send-message/:recipientId')
-  @ApiOperation({ summary: 'Sending Private message' })
+  @ApiOperation({ summary: 'Send private message' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -56,25 +57,24 @@ export class PrivateChatController implements OnModuleInit {
     @UploadedFile() file: Express.Multer.File,
     @GetUser('userId') senderId: string,
   ) {
-    if (recipientId === senderId) {
+    if (recipientId === senderId)
       throw new Error('Cannot send message to yourself');
-    }
 
     const conversation = await this.privateService.findOrCreateConversation(
       senderId,
       recipientId,
     );
-
     const message = await this.privateService.sendPrivateMessage(
       conversation.id,
       senderId,
       dto,
-      file,
+      // file,
     );
 
-    // Emit to both sender and recipient
-    this.gateway.emitNewMessage(senderId, message);
-    this.gateway.emitNewMessage(recipientId, message);
+    // Emit to both sender & recipient
+    [senderId, recipientId].forEach((id) =>
+      this.gateway.emitNewMessage(id, message),
+    );
 
     return { success: true, message };
   }

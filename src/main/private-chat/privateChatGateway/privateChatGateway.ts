@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   WebSocketGateway,
@@ -10,10 +11,11 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import * as jwt from 'jsonwebtoken';
-import { ConfigService } from '@nestjs/config';
 import { ENVEnum } from 'src/common/enum/env.enum';
 import { PrivateChatService } from '../private-chat.service';
 import { SendPrivateMessageDto } from '../dto/privateChatGateway.dto';
+import { ConfigService } from '@nestjs/config';
+import { PrivateMessage, PrivateMessageStatus } from '@prisma/client';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -30,29 +32,33 @@ export class PrivateChatGateway
     private readonly configService: ConfigService,
   ) {}
 
-  /** 🔹 Authenticate & join user room */
+  /** 🔹 Emit new message to specific user */
+  emitNewMessage(
+    userId: string,
+    message: PrivateMessage & {
+      file?: any;
+      statuses?: PrivateMessageStatus[];
+      sender?: { id: string; name: string; profile: string | null };
+    },
+  ): void {
+    this.server.to(userId).emit('private:new_message', message);
+  }
+
+  /** 🔹 Authenticate user & join personal room */
   handleConnection(client: Socket) {
     const token = client.handshake.headers.authorization?.split(' ')[1];
-    if (!token) {
-      client.disconnect();
-      console.log('Missing token');
-      return;
-    }
+    if (!token) return client.disconnect();
 
     try {
       const jwtSecret = this.configService.get<string>(ENVEnum.JWT_SECRET);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-      const payload = jwt.verify(token, jwtSecret as string) as jwt.JwtPayload;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const userId = payload.sub;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      const payload = jwt.verify(token, jwtSecret) as jwt.JwtPayload;
+      const userId = payload.sub as string;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       client.data.userId = userId;
-      client.join(userId);
+      client.join(userId); // Join personal room
 
-      console.log(
-        `Private chat: User ${userId} connected, socket ${client.id}`,
-      );
+      console.log(`User ${userId} connected (socket ${client.id})`);
     } catch (err) {
       client.disconnect();
       console.log(`Authentication failed: ${err.message}`);
@@ -60,57 +66,63 @@ export class PrivateChatGateway
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Private chat disconnected: ${client.id}`);
+    const userId = client.data?.userId;
+    if (userId) {
+      console.log(`User ${userId} disconnected (socket ${client.id})`);
+    } else {
+      console.log(`Socket disconnected: ${client.id}`);
+    }
   }
 
-  /** 🔹 Send message */
+  /** 🔹 Send direct message in real-time */
   @SubscribeMessage('private:send_message')
   async handleMessage(
     @MessageBody()
     payload: {
       recipientId: string;
       dto: SendPrivateMessageDto;
-      file?: Express.Multer.File;
-      userId: string;
     },
     @ConnectedSocket() client: Socket,
   ) {
-    const { recipientId, dto, file, userId } = payload;
+    const { recipientId, dto } = payload;
+    const userId = client.data.userId;
 
-    // Validate sender matches token
-    if (client.data.userId !== userId) {
-      console.log(
-        `User ID mismatch: client ${client.data.userId} vs payload ${userId}`,
-      );
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
       return;
     }
 
-    // Prevent sending to self
     if (userId === recipientId) {
-      console.log(`User ${userId} cannot send message to themselves`);
+      client.emit('error', { message: 'Cannot send message to yourself' });
       return;
     }
 
-    // Get or create conversation
-    const conversation = await this.privateChatService.findOrCreateConversation(
-      userId,
-      recipientId,
-    );
+    try {
+      // Find or create 1:1 conversation
+      const conversation =
+        await this.privateChatService.findOrCreateConversation(
+          userId,
+          recipientId,
+        );
 
-    // Save message
-    const message = await this.privateChatService.sendPrivateMessage(
-      conversation.id,
-      userId,
-      dto,
-      file,
-    );
+      const message = await this.privateChatService.sendPrivateMessage(
+        conversation.id,
+        userId,
+        dto,
+      );
 
-    // Emit to sender & recipient
-    this.server.to(userId).emit('private:new_message', message);
-    this.server.to(recipientId).emit('private:new_message', message);
+      // Emit to both sender and recipient
+      this.server.to(userId).emit('private:new_message', message);
+      this.server.to(recipientId).emit('private:new_message', message);
+    } catch (error) {
+      client.emit('error', {
+        message: 'Failed to send message',
+        error: error.message,
+      });
+    }
   }
 
-  /** 🔹 Load messages (chat history with pagination) */
+  /** 🔹 Load messages (pagination) */
   @SubscribeMessage('private:load_messages')
   async handleLoadMessages(
     @MessageBody()
@@ -118,67 +130,101 @@ export class PrivateChatGateway
     @ConnectedSocket() client: Socket,
   ) {
     const { conversationId, limit = 20, cursor } = payload;
+    const userId = client.data.userId;
 
-    const messages = await this.privateChatService.getConversationMessages(
-      conversationId,
-      limit,
-      cursor,
-    );
-
-    client.emit('private:chat_history', {
-      conversationId,
-      ...messages,
-    });
-  }
-
-  /** 🔹 Load user conversations */
-  @SubscribeMessage('private:load_conversations')
-  async handleLoadConversations(
-    @MessageBody() payload: { userId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    const { userId } = payload;
-
-    if (client.data.userId !== userId) {
-      console.log(
-        `User ID mismatch: client ${client.data.userId} vs payload ${userId}`,
-      );
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
       return;
     }
 
-    const conversations =
-      await this.privateChatService.getUserConversations(userId);
+    try {
+      const messages = await this.privateChatService.getConversationMessages(
+        conversationId,
+        limit,
+        cursor,
+      );
 
-    client.emit('private:conversations', conversations);
+      client.emit('private:chat_history', {
+        conversationId,
+        ...messages,
+      });
+
+      // Join conversation room for future updates
+      client.join(conversationId);
+    } catch (error) {
+      client.emit('error', {
+        message: 'Failed to load messages',
+        error: error.message,
+      });
+    }
+  }
+
+  /** 🔹 Load all user conversations */
+  @SubscribeMessage('private:load_conversations')
+  async handleLoadConversations(@ConnectedSocket() client: Socket) {
+    const userId = client.data.userId;
+
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      const conversations =
+        await this.privateChatService.getUserConversations(userId);
+      client.emit('private:conversations', conversations);
+    } catch (error) {
+      client.emit('error', {
+        message: 'Failed to load conversations',
+        error: error.message,
+      });
+    }
   }
 
   /** 🔹 Mark messages as read */
   @SubscribeMessage('private:mark_read')
   async handleMarkRead(
-    @MessageBody()
-    payload: { conversationId: string; userId: string },
+    @MessageBody() payload: { conversationId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const { conversationId, userId } = payload;
+    const { conversationId } = payload;
+    const userId = client.data.userId;
 
-    if (client.data.userId !== userId) {
-      console.log(
-        `User ID mismatch: client ${client.data.userId} vs payload ${userId}`,
-      );
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
       return;
     }
 
-    await this.privateChatService.markMessagesAsRead(conversationId, userId);
+    try {
+      await this.privateChatService.markMessagesAsRead(conversationId, userId);
 
-    // Notify conversation participants
-    this.server.to(conversationId).emit('private:messages_read', {
-      conversationId,
-      userId,
-    });
+      // Notify other members in the conversation
+      this.server.to(conversationId).emit('private:messages_read', {
+        conversationId,
+        userId,
+      });
+    } catch (error) {
+      client.emit('error', {
+        message: 'Failed to mark messages as read',
+        error: error.message,
+      });
+    }
   }
 
-  /** 🔹 Utility: Emit new message manually */
-  emitNewMessage(userId: string, message: any) {
-    this.server.to(userId).emit('private:new_message', message);
+  /** 🔹 Get online status of users */
+  @SubscribeMessage('private:get_online_status')
+  async handleGetOnlineStatus(
+    @MessageBody() payload: { userIds: string[] },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { userIds } = payload;
+    const onlineStatus: Record<string, boolean> = {};
+
+    for (const userId of userIds) {
+      const sockets = await this.server.in(userId).fetchSockets();
+      onlineStatus[userId] = sockets.length > 0;
+    }
+
+    client.emit('private:online_status', onlineStatus);
   }
 }
