@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Body,
   Controller,
@@ -8,7 +7,6 @@ import {
   Patch,
   Post,
   Query,
-  UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -20,10 +18,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { createPostSwaggerSchema } from './dto/createPost.swagger';
-import {
-  FileFieldsInterceptor,
-  FileInterceptor,
-} from '@nestjs/platform-express';
 import { CreatePostDto } from './dto/createPost.dto';
 import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
 import { CreatePostService } from './service/create-post.service';
@@ -35,6 +29,7 @@ import { PostsService } from './service/getmypost.service';
 import { DeletePostService } from './service/delete-post.service';
 import { GetAllPostsDto } from './dto/getPost.dto';
 import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Writer ---')
 @Controller('writer/post')
@@ -49,7 +44,7 @@ export class WriterController {
     private readonly deleteService: DeletePostService,
   ) {}
 
-  //create a post
+  // Create a new post
   @Post()
   @ApiOperation({ summary: 'Create a new post' })
   @ApiConsumes('multipart/form-data')
@@ -80,19 +75,15 @@ export class WriterController {
     @Body() dto: CreatePostDto,
     @UploadedFiles()
     files: {
-      thumbnail: Express.Multer.File[];
+      thumbnail?: Express.Multer.File[];
       audio?: Express.Multer.File[];
     },
     @GetUser('userId') userId: string,
   ) {
-    let thumbnailUrl;
-    let audio;
+    let thumbnailUrl: string | undefined;
+    let audioFile: Express.Multer.File | undefined;
 
-    // Convert categoryIds string -> array if needed
-    // if (dto.categoryIds && typeof dto.categoryIds === 'string') {
-    //   dto.categoryIds = dto.categoryIds?.split(',').map((id) => id.trim());
-    // }
-
+    // Upload thumbnail if provided
     if (files.thumbnail?.[0]) {
       const result = await this.cloudinaryService.uploadImageFromBuffer(
         files.thumbnail[0].buffer,
@@ -101,73 +92,161 @@ export class WriterController {
       thumbnailUrl = result.url;
     }
 
+    // Get audio file if provided
     if (files.audio?.[0]) {
-      audio = files.audio?.[0];
+      audioFile = files.audio[0];
     }
 
-    return this.createPostService.createPost(dto, thumbnailUrl, audio, userId);
-  }
-
-  //Update a post
-  @Patch(':postId')
-  @ApiOperation({ summary: 'Updated a post' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    description: 'Post update form data with image',
-    schema: {
-      type: 'object',
-      properties: {
-        ...updatePostSwaggerSchema.properties,
-      },
-    },
-  })
-  @UseInterceptors(FileInterceptor('thumbnail'))
-  async updatePost(
-    @Param('postId') postId: string,
-    @Body() dto: UpdatePostDto,
-    @UploadedFile() file: Express.Multer.File,
-    @GetUser('userId') userId: string,
-  ) {
-    if (!userId) {
-      throw new AppError(500, 'User id invalied!!!');
-    }
-    let uploadedUrl;
-    if (file) {
-      uploadedUrl = await this.cloudinaryService.uploadImageFromBuffer(
-        file.buffer,
-        file.originalname,
-      );
-    }
-    return this.updatePostService.updatePost(
-      postId,
+    return this.createPostService.createPost(
       dto,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      uploadedUrl?.url || undefined,
+      thumbnailUrl,
+      audioFile,
       userId,
     );
   }
 
-  //Writer all post
+  // Update a post
+  @Patch(':postId')
+  @ApiOperation({ summary: 'Update a post' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Post update form data with optional image and audio',
+    schema: {
+      type: 'object',
+      properties: {
+        ...updatePostSwaggerSchema.properties,
+        thumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Optional thumbnail image file',
+        },
+        audio: {
+          type: 'string',
+          format: 'binary',
+          description: 'Optional audio file',
+        },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'audio', maxCount: 1 },
+    ]),
+  )
+  async updatePost(
+    @Param('postId') postId: string,
+    @Body() dto: UpdatePostDto,
+    @UploadedFiles()
+    files: {
+      thumbnail?: Express.Multer.File[];
+      audio?: Express.Multer.File[];
+    },
+    @GetUser('userId') userId: string,
+  ) {
+    if (!userId) {
+      throw new AppError(500, 'User id invalid!');
+    }
+
+    let thumbnailUrl: string | undefined;
+    let audioFile: Express.Multer.File | undefined;
+
+    // Upload thumbnail if provided
+    if (files.thumbnail?.[0]) {
+      const result = await this.cloudinaryService.uploadImageFromBuffer(
+        files.thumbnail[0].buffer,
+        files.thumbnail[0].originalname,
+      );
+      thumbnailUrl = result.url;
+    }
+
+    // Get audio file if provided
+    if (files.audio?.[0]) {
+      audioFile = files.audio[0];
+    }
+
+    return this.updatePostService.updatePost(
+      postId,
+      dto,
+      thumbnailUrl,
+      audioFile,
+      userId,
+    );
+  }
+
+  // Get writer's own posts
   @Get('my-posts')
   @ApiOperation({
-    summary: 'Get all posts by a specific writer with filters and pagination',
+    summary:
+      'Get all posts by the authenticated writer with filters and pagination',
   })
-  async myPost(
+  async myPosts(
     @GetUser('userId') writerId: string,
     @Query() query: GetAllPostsDto,
   ) {
     return this.postsService.getMyAllPosts(writerId, query);
   }
 
-  //writer delet post
+  // Get specific post by ID
+  @Get(':postId')
+  @ApiOperation({
+    summary: 'Get a specific post by ID',
+  })
+  async getPostById(
+    @Param('postId') postId: string,
+    @GetUser('userId') writerId: string,
+  ) {
+    return this.postsService.getPostById(postId, writerId);
+  }
+
+  // Delete post
   @Delete(':postId')
   @ApiOperation({
-    summary: 'Delete Post',
+    summary: 'Delete a post',
   })
   async deletePost(
     @Param('postId') postId: string,
     @GetUser('userId') writerId: string,
   ) {
-    return await this.deleteService.deletePost(writerId, postId);
+    return this.deleteService.deletePost(writerId, postId);
+  }
+
+  // Get posts by series
+  @Get('series/:seriesId')
+  @ApiOperation({
+    summary: 'Get all posts in a specific series',
+  })
+  async getPostsBySeries(
+    @Param('seriesId') seriesId: string,
+    @GetUser('userId') writerId: string,
+    @Query() query: GetAllPostsDto,
+  ) {
+    return this.postsService.getPostsBySeries(seriesId, writerId, query);
+  }
+
+  // Publish/unpublish post
+  @Patch(':postId/publish')
+  @ApiOperation({
+    summary: 'Publish or unpublish a post',
+  })
+  async togglePublishPost(
+    @Param('postId') postId: string,
+    @GetUser('userId') writerId: string,
+    @Body() body: { status: 'PUBLISHED' | 'DRAFT' },
+  ) {
+    return this.updatePostService.updatePostStatus(
+      postId,
+      body.status,
+      writerId,
+    );
+  }
+
+  // Get writer statistics
+  @Get('stats/overview')
+  @ApiOperation({
+    summary: 'Get writer statistics overview',
+  })
+  async getWriterStats(@GetUser('userId') writerId: string) {
+    return this.postsService.getWriterStats(writerId);
   }
 }
