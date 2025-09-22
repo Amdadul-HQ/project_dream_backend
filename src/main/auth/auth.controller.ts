@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+
 import {
   Body,
   Controller,
@@ -58,7 +58,6 @@ export class AuthController {
       uploadedUrl?.url || null,
     );
   }
-  
 
   // User login
   @Post('login')
