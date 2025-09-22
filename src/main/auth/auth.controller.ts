@@ -58,6 +58,7 @@ export class AuthController {
       uploadedUrl?.url || null,
     );
   }
+  
 
   // User login
   @Post('login')
