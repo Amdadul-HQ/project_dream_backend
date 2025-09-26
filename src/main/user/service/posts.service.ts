@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
+// posts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Post } from '@prisma/client';
 import { PostFeedQueryDto } from '../dto/postFeedQuery.dto';
@@ -19,7 +22,7 @@ export class PostsService {
     if (categoryId) {
       whereClause = {
         ...whereClause,
-        categories: { some: { id: categoryId } },
+        categories: { some: { categoryId: categoryId } }, // Fixed relation field
       };
     }
 
@@ -29,13 +32,43 @@ export class PostsService {
       cursor: cursor ? { id: cursor } : undefined,
       skip: cursor ? 1 : 0, // Skip the cursor itself
       orderBy: { createdAt: 'desc' as const },
+      include: {
+        author: {
+          // Fixed field name from 'writer' to 'author'
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            profile: true,
+          },
+        },
+        categories: {
+          include: {
+            category: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+        likes: {
+          select: {
+            userId: true,
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            saves: true,
+          },
+        },
+      },
     };
 
     switch (feedType) {
       case 'trending': {
-        // Trending logic: Order by a combination of likes, comments, views, etc.
-        // A simple implementation could be by recent popularity score.
-        // For simplicity here, we'll order by viewsCount for now.
         posts = await this.prisma.post.findMany({
           ...commonFindManyArgs,
           orderBy: { viewsCount: 'desc' },
@@ -59,7 +92,7 @@ export class PostsService {
           ...commonFindManyArgs,
           where: {
             ...whereClause,
-            writerId: { in: followingIds },
+            authorId: { in: followingIds }, // Fixed field name
           },
         });
         break;
@@ -74,16 +107,15 @@ export class PostsService {
           ...commonFindManyArgs,
           where: {
             ...whereClause,
-            like: { some: { id: userId } },
+            likes: { some: { userId: userId } }, // Fixed relation field
           },
         });
         break;
       }
       case 'topPicks': {
-        // Top Picks logic: A more sophisticated algorithm, maybe based on views and creation date.
         posts = await this.prisma.post.findMany({
           ...commonFindManyArgs,
-          orderBy: { likeCount: 'desc' }, // Simple implementation, sort by likes
+          orderBy: { likeCount: 'desc' },
         });
         break;
       }
@@ -100,7 +132,7 @@ export class PostsService {
       ? paginatedPosts[paginatedPosts.length - 1].id
       : null;
 
-    return { posts: paginatedPosts, nextCursor };
+    return { posts: paginatedPosts, nextCursor, hasNextPage };
   }
 
   async getPostWithViewIncrement(postId: string) {
@@ -108,25 +140,72 @@ export class PostsService {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
       include: {
-        writer: {
+        author: {
+          // Fixed field name
           select: {
+            id: true,
             name: true,
+            username: true,
             email: true,
+            profile: true,
           },
         },
-        categories: true,
+        categories: {
+          include: {
+            category: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
         comments: {
           include: {
             user: {
               select: {
+                id: true,
                 name: true,
+                username: true,
+                profile: true,
+              },
+            },
+            replies: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    username: true,
+                    profile: true,
+                  },
+                },
               },
             },
           },
+          where: {
+            parentId: null, // Only get top-level comments
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
         },
-        like: {
+        likes: {
           select: {
-            id: true,
+            userId: true,
+          },
+        },
+        saves: {
+          select: {
+            userId: true,
+          },
+        },
+        series: true,
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            saves: true,
           },
         },
       },
@@ -142,7 +221,10 @@ export class PostsService {
       data: { viewsCount: { increment: 1 } },
     });
 
-    // 3. Return the original post data.
-    return post;
+    // 3. Return the post data with incremented view count.
+    return {
+      ...post,
+      viewsCount: post.viewsCount + 1,
+    };
   }
 }

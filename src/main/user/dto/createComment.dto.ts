@@ -1,29 +1,23 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateCommentDto {
-  @ApiProperty({
-    description: 'The unique identifier of the post the comment belongs to.',
-    example: '550e8400-e29b-41d4-a716-446655440000',
-  })
+  @ApiProperty({ description: 'The ID of the post to comment on' })
   @IsString()
   @IsNotEmpty()
+  @IsUUID()
   postId: string;
 
-  @ApiProperty({
-    description: 'The content of the comment.',
-    example: 'This is a great post!',
-  })
+  @ApiProperty({ description: 'The content of the comment' })
   @IsString()
   @IsNotEmpty()
-  comment: string;
+  content: string;
 
-  @ApiProperty({
-    description: 'The parent comment ID, if this is a reply.',
-    required: false,
-    example: '550e8400-e29b-41d4-a716-446655440001',
+  @ApiPropertyOptional({
+    description: 'The ID of the parent comment (for replies)',
   })
-  @IsString()
   @IsOptional()
+  @IsString()
+  @IsUUID()
   parentId?: string;
 }

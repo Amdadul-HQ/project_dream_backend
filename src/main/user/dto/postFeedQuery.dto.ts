@@ -1,44 +1,45 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+
+export enum FeedType {
+  RECENT = 'recent',
+  TRENDING = 'trending',
+  FOLLOWING = 'following',
+  LIKED = 'liked',
+  TOP_PICKS = 'topPicks',
+}
 
 export class PostFeedQueryDto {
-  @ApiProperty({
-    description: 'Type of feed to retrieve.',
-    enum: ['recent', 'trending', 'following', 'liked', 'topPicks'],
-    required: false,
-    default: 'recent',
-  })
-  @IsOptional()
-  @IsString()
-  @IsIn(['recent', 'trending', 'following', 'liked', 'topPicks'])
-  feedType?: 'recent' | 'trending' | 'following' | 'liked' | 'topPicks' =
-    'recent';
-
-  @ApiProperty({
-    description: 'Filter posts by category ID.',
-    required: false,
-  })
+  @ApiPropertyOptional({ description: 'Category ID to filter posts' })
   @IsOptional()
   @IsString()
   categoryId?: string;
 
-  @ApiProperty({
-    description: 'Post ID for cursor-based pagination.',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Type of feed to retrieve',
+    enum: FeedType,
+    default: FeedType.RECENT,
   })
+  @IsOptional()
+  @IsEnum(FeedType)
+  feedType?: FeedType;
+
+  @ApiPropertyOptional({ description: 'Cursor for pagination' })
   @IsOptional()
   @IsString()
   cursor?: string;
 
-  @ApiProperty({
-    description: 'Number of posts to return per page.',
-    required: false,
+  @ApiPropertyOptional({
+    description: 'Number of posts per page',
+    minimum: 1,
+    maximum: 50,
     default: 10,
   })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => parseInt(value))
   @IsInt()
   @Min(1)
-  pageSize?: number = 10;
+  @Max(50)
+  pageSize?: number;
 }

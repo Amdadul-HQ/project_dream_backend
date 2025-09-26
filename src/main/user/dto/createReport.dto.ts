@@ -1,20 +1,41 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+// createReport.dto.ts
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  IsEnum,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ReportType } from '@prisma/client';
 
 export class CreateReportDto {
   @ApiProperty({
-    description: 'The unique identifier of the post being reported.',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Type of report',
+    enum: ReportType,
   })
-  @IsString()
-  @IsNotEmpty()
-  postId: string;
+  @IsEnum(ReportType)
+  type: ReportType;
 
-  @ApiProperty({
-    description: 'The reason for reporting the post.',
-    example: 'This post contains offensive language.',
-  })
+  @ApiProperty({ description: 'Reason for the report' })
   @IsString()
   @IsNotEmpty()
   reason: string;
+
+  @ApiPropertyOptional({ description: 'Additional description for the report' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'The ID of the post to report' })
+  @IsOptional()
+  @IsString()
+  @IsUUID()
+  postId?: string;
+
+  @ApiPropertyOptional({ description: 'The ID of the user to report' })
+  @IsOptional()
+  @IsString()
+  @IsUUID()
+  userId?: string;
 }
