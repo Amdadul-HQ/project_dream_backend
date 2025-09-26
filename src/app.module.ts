@@ -11,9 +11,9 @@ import { ENVEnum } from './common/enum/env.enum';
 import { JwtStrategy } from './common/jwt/jwt.strategy';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { LibModule } from './lib/lib.module';
-import { NotificationModule } from './lib/notification/notification.module';
 import { MainModule } from './main/main.module';
 import { AppService } from './app.service';
+import { NotificationModule } from './main/notification/notification.module';
 
 @Module({
   imports: [
@@ -32,7 +32,7 @@ import { AppService } from './app.service';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
+      useFactory: (configService: ConfigService) => {
         const host = configService.getOrThrow<string>(ENVEnum.REDIS_HOST);
         const port = configService.getOrThrow<string>(ENVEnum.REDIS_PORT);
 

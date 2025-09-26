@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/lib/prisma/prisma.service';
-import { FileService } from 'src/lib/utils/file.service';
+// import { FileService } from 'src/lib/utils/file.service';
 import { SendPrivateMessageDto } from './dto/privateChatGateway.dto';
 import {
   PrivateMessage,
@@ -12,7 +12,7 @@ import {
 export class PrivateChatService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fileService: FileService,
+    // private readonly fileService: FileService,
   ) {}
 
   /** 🔹 Find or create a direct conversation between two users */

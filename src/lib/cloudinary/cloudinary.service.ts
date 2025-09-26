@@ -1,16 +1,16 @@
+/* eslint-disable @typescript-eslint/prefer-promise-reject-errors */
 import * as path from 'path';
 import {
   Global,
   Injectable,
-  InternalServerErrorException,
+  // InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Audio } from '@prisma/client';
 import { ENVEnum } from 'src/common/enum/env.enum';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
-import { v4 as uuidv4 } from 'uuid';
-import mime from 'mime-types';
+// import { v4 as uuidv4 } from 'uuid';
+// import mime from 'mime-types';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Global()
@@ -92,52 +92,52 @@ export class CloudinaryService {
   }
 
   async deleteImage(url: string): Promise<void> {
-    const publicId = await this.extractPublicId(url);
+    const publicId = this.extractPublicId(url);
     await cloudinary.uploader.destroy(publicId);
   }
 
-  async processUploadedAudio(
-    file: Express.Multer.File,
-    postId: string,
-    seriesId?: string,
-    part?: number,
-  ): Promise<Audio> {
-    try {
-      if (!file) {
-        throw new InternalServerErrorException(
-          'Uploaded audio file is missing',
-        );
-      }
+  // async processUploadedAudio(
+  //   file: Express.Multer.File,
+  //   postId: string,
+  //   seriesId?: string,
+  //   part?: number,
+  // ): Promise<any> {
+  //   try {
+  //     if (!file) {
+  //       throw new InternalServerErrorException(
+  //         'Uploaded audio file is missing',
+  //       );
+  //     }
 
-      const uploadResult = await this.uploadAudioFromBuffer(
-        file.buffer,
-        file.originalname,
-      );
+  //     const uploadResult = await this.uploadAudioFromBuffer(
+  //       file.buffer,
+  //       file.originalname,
+  //     );
 
-      const fileId = uuidv4();
-      const fileExt = path.extname(file.originalname);
-      const mimeType =
-        file.mimetype || mime.lookup(file.originalname) || 'audio/mpeg';
+  //     const fileId = uuidv4();
+  //     const fileExt = path.extname(file.originalname);
+  //     const mimeType =
+  //       file.mimetype || mime.lookup(file.originalname) || 'audio/mpeg';
 
-      const createAudioDto = {
-        id: fileId,
-        postId,
-        seriesId,
-        part,
-        filename: `${fileId}${fileExt}`,
-        originalFilename: file.originalname,
-        path: uploadResult.public_id,
-        url: uploadResult.url,
-        mimeType,
-        size: file.size,
-      };
+  //     // const createAudioDto = {
+  //     //   id: fileId,
+  //     //   postId,
+  //     //   seriesId,
+  //     //   part,
+  //     //   filename: `${fileId}${fileExt}`,
+  //     //   originalFilename: file.originalname,
+  //     //   path: uploadResult.public_id,
+  //     //   url: uploadResult.url,
+  //     //   mimeType,
+  //     //   size: file.size,
+  //     // };
 
-      return await this.prisma.audio.create({
-        data: createAudioDto,
-      });
-    } catch (error) {
-      console.error('Error processing uploaded audio:', error);
-      throw new InternalServerErrorException('Failed to upload audio file');
-    }
-  }
+  //     // return await this.prisma.audio.create({
+  //     //   data: createAudioDto,
+  //     // });
+  //   } catch (error) {
+  //     console.error('Error processing uploaded audio:', error);
+  //     throw new InternalServerErrorException('Failed to upload audio file');
+  //   }
+  // }
 }

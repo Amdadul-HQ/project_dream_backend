@@ -1,25 +1,25 @@
-import { FileType } from '@prisma/client';
-import { IsString, IsNumber, IsEnum } from 'class-validator';
+// createFile.dto.ts
+// import { IsString, IsNumber, IsEnum } from 'class-validator';
 
-export class CreateFileDto {
-  @IsString()
-  filename: string;
+// export class CreateFileDto {
+//   @IsString()
+//   filename: string;
 
-  @IsString()
-  originalFilename: string;
+//   @IsString()
+//   originalFilename: string;
 
-  @IsString()
-  path: string;
+//   @IsString()
+//   path: string;
 
-  @IsString()
-  url: string;
+//   @IsString()
+//   url: string;
 
-  @IsEnum([FileType.docs, FileType.image, FileType.link])
-  fileType: FileType;
+//   @IsEnum([FileType.docs, FileType.image, FileType.link])
+//   fileType: FileType;
 
-  @IsString()
-  mimeType: string;
+//   @IsString()
+//   mimeType: string;
 
-  @IsNumber()
-  size: number;
-}
+//   @IsNumber()
+//   size: number;
+// }
