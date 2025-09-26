@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+// follow.service.ts
 import {
   ConflictException,
   Injectable,
@@ -33,9 +34,8 @@ export class FollowService {
           },
         });
 
-        // Update or create UserOverview for followee
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        await tx.userOverview.upsert({
+        // Update or create UserStats for followee (totalFollowers)
+        await tx.userStats.upsert({
           where: { userId: followeeId },
           create: {
             userId: followeeId,
@@ -43,6 +43,18 @@ export class FollowService {
           },
           update: {
             totalFollowers: { increment: 1 },
+          },
+        });
+
+        // Update or create UserStats for follower (totalFollowing)
+        await tx.userStats.upsert({
+          where: { userId: followerId },
+          create: {
+            userId: followerId,
+            totalFollowing: 1,
+          },
+          update: {
+            totalFollowing: { increment: 1 },
           },
         });
       });
@@ -69,12 +81,19 @@ export class FollowService {
           },
         });
 
-        // Decrease follower count in overview (if exists)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        await tx.userOverview.updateMany({
+        // Decrease follower count for followee
+        await tx.userStats.updateMany({
           where: { userId: followeeId, totalFollowers: { gt: 0 } },
           data: {
             totalFollowers: { decrement: 1 },
+          },
+        });
+
+        // Decrease following count for follower
+        await tx.userStats.updateMany({
+          where: { userId: followerId, totalFollowing: { gt: 0 } },
+          data: {
+            totalFollowing: { decrement: 1 },
           },
         });
       });

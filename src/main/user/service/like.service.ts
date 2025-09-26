@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+// like.service.ts
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { successResponse } from 'src/common/utils/response.util';
 import { PrismaService } from 'src/lib/prisma/prisma.service';
 
@@ -14,55 +19,77 @@ export class LikeService {
       throw new NotFoundException(`Post with ID ${postId} not found.`);
     }
 
-    // Connect the user to the post's like list
-    const like = await this.prisma.post.update({
-      where: { id: postId },
-      data: {
-        likeCount: { increment: 1 },
-        like: {
-          connect: {
-            id: userId,
-          },
+    // Check if user already liked this post
+    const existingLike = await this.prisma.postLike.findUnique({
+      where: {
+        userId_postId: {
+          userId,
+          postId,
         },
       },
     });
 
-    return successResponse(like, 'Post like successfull');
+    if (existingLike) {
+      throw new ConflictException('You have already liked this post.');
+    }
+
+    // Create the like record and update post like count
+    await this.prisma.$transaction(async (tx) => {
+      // Create PostLike record
+      await tx.postLike.create({
+        data: {
+          userId,
+          postId,
+        },
+      });
+
+      // Increment like count on post
+      await tx.post.update({
+        where: { id: postId },
+        data: { likeCount: { increment: 1 } },
+      });
+    });
+
+    return successResponse({ postId, userId }, 'Post liked successfully');
   }
 
   // Logic to unlike a post
   async unlikePost(postId: string, userId: string) {
-    // Check if the post exists and the user has liked it
-    const post = await this.prisma.post.findFirst({
+    // Check if the like exists
+    const existingLike = await this.prisma.postLike.findUnique({
       where: {
-        id: postId,
-        like: {
-          some: {
-            id: userId,
-          },
+        userId_postId: {
+          userId,
+          postId,
         },
       },
     });
 
-    if (!post) {
+    if (!existingLike) {
       throw new NotFoundException(
         'Post not found or you have not liked this post.',
       );
     }
 
-    // Disconnect the user from the post's like list
-    const unLike = await this.prisma.post.update({
-      where: { id: postId },
-      data: {
-        likeCount: { decrement: 1 },
-        like: {
-          disconnect: {
-            id: userId,
+    // Remove the like record and update post like count
+    await this.prisma.$transaction(async (tx) => {
+      // Delete PostLike record
+      await tx.postLike.delete({
+        where: {
+          userId_postId: {
+            userId,
+            postId,
           },
         },
-      },
+      });
+
+      // Decrement like count on post
+      await tx.post.update({
+        where: { id: postId },
+        data: { likeCount: { decrement: 1 } },
+      });
     });
 
-    return successResponse(unLike, 'Post unliked successfully');
+    return successResponse({ postId, userId }, 'Post unliked successfully');
   }
 }
