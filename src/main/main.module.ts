@@ -7,8 +7,6 @@ import { UserModule } from './user/user.module';
 import { DashboardModule } from './admin/dashboard/dashboard.module';
 import { PrivateChatModule } from './private-chat/private-chat.module';
 import { NotificationModule } from './notification/notification.module';
-import { NotificationModule } from './notification/notification.module';
-import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
