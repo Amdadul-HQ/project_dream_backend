@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 import {
   Body,
   Controller,
@@ -45,7 +43,7 @@ export class AuthController {
     @Body() registerUserDto: RegisterUserDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    let uploadedUrl: any = null;
+    let uploadedUrl: { secure_url: string } | null = null;
 
     if (file) {
       uploadedUrl = await this.cloudinaryService.uploadImageFromBuffer(
@@ -55,7 +53,7 @@ export class AuthController {
     }
     return await this.authService.register(
       registerUserDto,
-      uploadedUrl?.url || null,
+      uploadedUrl ? uploadedUrl.secure_url : null,
     );
   }
 
