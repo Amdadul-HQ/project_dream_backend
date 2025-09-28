@@ -34,6 +34,7 @@ export class AuthService {
    * 🔹 Register user with email/password + social links
    */
   async register(dto: RegisterUserDto, file: string | null) {
+    console.log(dto);
     try {
       if (!file) {
         throw new BadRequestException('Profile image is required');
@@ -54,7 +55,6 @@ export class AuthService {
             name: dto.name,
             email: dto.email,
             phone: dto.phone,
-            username: dto.email.split('@')[0],
             address: dto.address,
             profile: file,
             role: Role.USER,
@@ -64,7 +64,9 @@ export class AuthService {
         await tx.auth.create({
           data: {
             email: user.email,
+            name: user.name,
             password: hashedPassword,
+            role: Role.USER,
             userId: user.id,
           },
         });
@@ -170,7 +172,6 @@ export class AuthService {
         user = await this.prisma.user.create({
           data: {
             name: profile.name || 'No Name',
-            username: profile.email.split('@')[0],
             address: 'Unknown',
             phone: 'Unknown',
             email: profile.email,
@@ -182,6 +183,10 @@ export class AuthService {
         await this.prisma.auth.create({
           data: {
             email: user.email,
+            name: user.name,
+            // Google users authenticate via OAuth, store a placeholder password
+            password: 'GOOGLE_OAUTH_USER',
+            role: Role.USER,
             userId: user.id,
           },
         });

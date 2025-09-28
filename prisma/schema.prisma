@@ -16,13 +16,11 @@ datasource db {
 
 model User {
   id              String           @id @default(cuid())
-  username        String           @unique
   name            String
   phone           String?
   email           String           @unique
   address         String?
   profile         String?
-  bio             String?
   isVerified      Boolean          @default(false)
   role            Role             @default(USER)
   isGoogle        Boolean          @default(false)
@@ -68,29 +66,21 @@ model User {
 
   // Indexes for performance
   @@index([email])
-  @@index([username])
   @@index([status])
   @@index([lastActiveAt])
   @@index([createdAt])
 }
 
 model Auth {
-  id              String           @id @default(cuid())
-  email           String           @unique
-  password        String?
-  refreshToken    String?
-  lastLoginAt     DateTime?
-  loginAttempts   Int              @default(0)
-  lockedUntil     DateTime?
-  
-  userId          String           @unique
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  @@index([email])
-  @@index([refreshToken])
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Follow {
