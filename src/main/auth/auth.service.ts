@@ -58,7 +58,6 @@ export class AuthService {
             address: dto.address,
             profile: file,
             role: Role.USER,
-            lastActiveAt: new Date(),
           },
         });
 
