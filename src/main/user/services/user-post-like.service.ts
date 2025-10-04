@@ -4,10 +4,14 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/lib/prisma/prisma.service';
+import { NotificationGateway } from 'src/main/notification/notification.gateway';
 
 @Injectable()
 export class PostLikeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationGateway: NotificationGateway,
+  ) {}
 
   /**
    * Like a post
@@ -48,6 +52,12 @@ export class PostLikeService {
       throw new ConflictException('You have already liked this post');
     }
 
+    // Get liker info
+    const liker = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, profile: true },
+    });
+
     // Create like
     const like = await this.prisma.postLike.create({
       data: {
@@ -80,15 +90,33 @@ export class PostLikeService {
       },
     });
 
-    // Create notification (don't notify if liking own post)
+    // Create and push notification
     if (userId !== post.authorId) {
-      await this.prisma.notification.create({
+      const notification = await this.prisma.notification.create({
         data: {
           type: 'POST_LIKED',
           title: 'Post Liked',
-          content: `Someone liked your post: "${post.title}"`,
+          content: `${liker?.name} liked your post: "${post.title}"`,
           senderId: userId,
           receiverId: post.authorId,
+          postId,
+        },
+      });
+
+      // ⚡ PUSH REAL-TIME NOTIFICATION
+      this.notificationGateway.pushNotificationToUser(post.authorId, {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        content: notification.content,
+        isRead: notification.isRead,
+        createdAt: notification.createdAt,
+        sender: {
+          id: liker?.id,
+          name: liker?.name,
+          profile: liker?.profile,
+        },
+        metadata: {
           postId,
         },
       });

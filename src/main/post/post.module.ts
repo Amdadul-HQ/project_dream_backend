@@ -6,6 +6,8 @@ import { PostSeriesController } from './controller/post-series.controller';
 import { PostsPublicController } from './controller/post-get.controller';
 import { PostController } from './controller/post-create.controller';
 import { GetPostsService } from './services/post-get.service';
+import { NotificationGateway } from '../notification/notification.gateway';
+import { NotificationService } from '../notification/notification.service';
 
 @Module({
   controllers: [PostController, PostSeriesController, PostsPublicController],
@@ -14,6 +16,8 @@ import { GetPostsService } from './services/post-get.service';
     CloudinaryService,
     PostSeriesService,
     GetPostsService,
+    NotificationGateway,
+    NotificationService,
   ],
 })
 export class PostModule {}

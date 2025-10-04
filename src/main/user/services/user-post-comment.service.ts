@@ -6,10 +6,14 @@ import {
 import { PrismaService } from 'src/lib/prisma/prisma.service';
 import { CreateCommentDto } from '../dto/create-comment.dto';
 import { UpdateCommentDto } from '../dto/update-comment.dto';
+import { NotificationGateway } from 'src/main/notification/notification.gateway';
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationGateway: NotificationGateway,
+  ) {}
 
   /**
    * Create a comment on a post or reply to another comment
@@ -52,6 +56,11 @@ export class CommentService {
         );
       }
     }
+
+    const commenter = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, profile: true },
+    });
 
     // Create comment
     const comment = await this.prisma.comment.create({
@@ -125,17 +134,36 @@ export class CommentService {
       }
     }
 
-    // Create notification (don't notify if commenting on own post/comment)
+    // Create and push notification
     if (userId !== receiverId) {
-      await this.prisma.notification.create({
+      const notification = await this.prisma.notification.create({
         data: {
           type: dto.parentId ? 'COMMENT_REPLIED' : 'POST_COMMENTED',
           title: dto.parentId ? 'Reply to Comment' : 'New Comment',
           content: dto.parentId
-            ? `Someone replied to your comment`
-            : `Someone commented on your post: "${post.title}"`,
+            ? `${commenter?.name} replied to your comment`
+            : `${commenter?.name} commented on your post: "${post.title}"`,
           senderId: userId,
           receiverId,
+          postId,
+          commentId: comment.id,
+        },
+      });
+
+      // ⚡ PUSH REAL-TIME NOTIFICATION
+      this.notificationGateway.pushNotificationToUser(receiverId, {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        content: notification.content,
+        isRead: notification.isRead,
+        createdAt: notification.createdAt,
+        sender: {
+          id: commenter?.id,
+          name: commenter?.name,
+          profile: commenter?.profile,
+        },
+        metadata: {
           postId,
           commentId: comment.id,
         },

@@ -9,10 +9,14 @@ import { Report, ReportStatus } from '@prisma/client';
 import { CreateReportDto } from '../dto/crete-report.dto';
 import { ReportQueryDto } from '../dto/report-query.dto';
 import { UpdateReportStatusDto } from '../dto/update-report-status.dto';
+import { NotificationGateway } from 'src/main/notification/notification.gateway';
 
 @Injectable()
 export class ReportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationGateway: NotificationGateway,
+  ) {}
 
   /**
    * Create a new report
@@ -328,7 +332,8 @@ export class ReportService {
     if (!dto.status) {
       throw new BadRequestException('Status must be provided');
     }
-    await this.notifyReporter(report, dto.status);
+    // Notify reporter with real-time push
+    await this.notifyReporterRealTime(report, dto.status);
 
     return updatedReport;
   }
@@ -405,10 +410,7 @@ export class ReportService {
     });
   }
 
-  /**
-   * Notify reporter about report decision
-   */
-  private async notifyReporter(
+  private async notifyReporterRealTime(
     report: Report,
     newStatus: ReportStatus,
   ): Promise<void> {
@@ -426,7 +428,7 @@ export class ReportService {
         break;
     }
 
-    await this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         type: 'SYSTEM_ANNOUNCEMENT',
         title: 'Report Update',
@@ -436,6 +438,20 @@ export class ReportService {
           reportId: report.id,
           status: newStatus,
         },
+      },
+    });
+
+    // ⚡ PUSH REAL-TIME NOTIFICATION
+    this.notificationGateway.pushNotificationToUser(report.reporterId, {
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      content: notification.content,
+      isRead: notification.isRead,
+      createdAt: notification.createdAt,
+      metadata: {
+        reportId: report.id,
+        status: newStatus,
       },
     });
   }

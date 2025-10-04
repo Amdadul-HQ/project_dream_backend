@@ -7,10 +7,14 @@ import {
 import { PrismaService } from 'src/lib/prisma/prisma.service';
 import { CreatePostDto } from '../dto/create-post.dto';
 import { Post, PostStatus } from '@prisma/client';
+import { NotificationGateway } from 'src/main/notification/notification.gateway';
 
 @Injectable()
 export class CreatePostService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationGateway: NotificationGateway,
+  ) {}
 
   async createPost(
     createPostDto: CreatePostDto,
@@ -195,8 +199,9 @@ export class CreatePostService {
     await this.createActivityLog(writerId, post.id, status);
 
     // Create notification if published
+    // Notify followers with real-time push
     if (status === PostStatus.PUBLISHED) {
-      await this.notifyFollowers(writerId, post.id);
+      await this.notifyFollowersRealTime(writerId, post);
     }
 
     return post;
@@ -317,11 +322,10 @@ export class CreatePostService {
   /**
    * Notify followers when a post is published
    */
-  private async notifyFollowers(
+  private async notifyFollowersRealTime(
     authorId: string,
-    postId: string,
+    post: Post & { author: { name: string } },
   ): Promise<void> {
-    // Get all followers
     const followers = await this.prisma.follow.findMany({
       where: {
         followeeId: authorId,
@@ -331,35 +335,52 @@ export class CreatePostService {
       },
     });
 
-    // Get post details for notification
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-      select: {
-        title: true,
-        author: {
-          select: {
-            name: true,
-          },
-        },
-      },
+    // Get author info for notification
+    const author = await this.prisma.user.findUnique({
+      where: { id: authorId },
+      select: { id: true, name: true, profile: true },
     });
 
-    if (!post) return;
+    if (!author || followers.length === 0) return;
 
-    // Create notifications for all followers
+    // Create notifications in database
     const notifications = followers.map((follower) => ({
       type: 'POST_PUBLISHED' as const,
       title: 'New Post Published',
-      content: `${post.author.name} published a new post: "${post.title}"`,
+      content: `${author.name} published a new post: "${post.title}"`,
       senderId: authorId,
       receiverId: follower.followerId,
-      postId,
+      postId: post.id,
     }));
 
-    if (notifications.length > 0) {
-      await this.prisma.notification.createMany({
-        data: notifications,
+    await this.prisma.notification.createMany({
+      data: notifications,
+    });
+
+    // ⚡ PUSH REAL-TIME NOTIFICATIONS to all followers
+    const notificationPayload = {
+      type: 'POST_PUBLISHED',
+      title: 'New Post Published',
+      content: `${author.name} published a new post: "${post.title}"`,
+      sender: {
+        id: author.id,
+        name: author.name,
+        profile: author.profile,
+      },
+      metadata: {
+        postId: post.id,
+        postTitle: post.title,
+      },
+    };
+
+    // Push to each follower
+    followers.forEach((follower) => {
+      this.notificationGateway.pushNotificationToUser(follower.followerId, {
+        ...notificationPayload,
+        receiverId: follower.followerId,
+        isRead: false,
+        createdAt: new Date(),
       });
-    }
+    });
   }
 }
