@@ -26,7 +26,6 @@ export class GetPostsService {
     // Build where clause
     const where: Prisma.PostWhereInput = {
       status: PostStatus.PUBLISHED,
-      publishedAt: { not: null },
     };
 
     // Category filter
