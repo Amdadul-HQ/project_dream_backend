@@ -6,7 +6,13 @@ import { PostModule } from './post/post.module';
 import { PostCategoryModule } from './admin/post-category/post-category.module';
 
 @Module({
-  imports: [AuthModule, PrivateChatModule, NotificationModule, PostModule, PostCategoryModule],
+  imports: [
+    AuthModule,
+    PrivateChatModule,
+    NotificationModule,
+    PostModule,
+    PostCategoryModule,
+  ],
   controllers: [],
   providers: [],
 })

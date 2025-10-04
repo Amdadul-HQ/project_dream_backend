@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { PostCategoryService } from './post-category.service';
 import { PostCategoryController } from './post-category.controller';
+import { PostCategoryService } from './services/post-category-create.service';
 
 @Module({
   controllers: [PostCategoryController],

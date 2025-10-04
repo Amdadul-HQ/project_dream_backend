@@ -1,34 +1,24 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { PostCategoryService } from './post-category.service';
-import { CreatePostCategoryDto } from './dto/create-post-category.dto';
-import { UpdatePostCategoryDto } from './dto/update-post-category.dto';
+import { Controller, Get, Post, Body } from '@nestjs/common';
+import { CreateCategoryDto } from './dto/create-post-category.dto';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ValidateAdmin } from 'src/common/jwt/jwt.decorator';
+import { PostCategoryService } from './services/post-category-create.service';
 
+@ApiTags('Admin Post Category ---')
 @Controller('post-category')
 export class PostCategoryController {
   constructor(private readonly postCategoryService: PostCategoryService) {}
-
+  @ApiBearerAuth()
+  @ValidateAdmin()
   @Post()
-  create(@Body() createPostCategoryDto: CreatePostCategoryDto) {
-    return this.postCategoryService.create(createPostCategoryDto);
+  @ApiOperation({ summary: 'Create a new category' })
+  async createCategory(@Body() dto: CreateCategoryDto) {
+    return this.postCategoryService.createPostCategory(dto);
   }
 
   @Get()
-  findAll() {
-    return this.postCategoryService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postCategoryService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePostCategoryDto: UpdatePostCategoryDto) {
-    return this.postCategoryService.update(+id, updatePostCategoryDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.postCategoryService.remove(+id);
+  @ApiOperation({ summary: 'Get All Category' })
+  async getAllCategory() {
+    return this.postCategoryService.getAllCategory();
   }
 }
