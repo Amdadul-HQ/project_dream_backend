@@ -7,11 +7,13 @@ import {
   PrivateMessageStatus,
   Conversation,
 } from '@prisma/client';
+import { NotificationGateway } from '../notification/notification.gateway';
 
 @Injectable()
 export class PrivateChatService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notificationGateway: NotificationGateway,
     // private readonly fileService: FileService,
   ) {}
 
@@ -84,11 +86,50 @@ export class PrivateChatService {
         receiverId:
           conversation.members.find((m) => m.userId !== senderId)?.userId ??
           null,
-        // fileUrl: fileRecord?.url,
-        // fileType: fileRecord?.type,
       },
       include: { sender: true, statuses: true },
     });
+
+    // Get receiver ID
+    const receiverId = conversation.members.find(
+      (m) => m.userId !== senderId,
+    )?.userId;
+
+    if (receiverId) {
+      // Create notification in DB
+      const notification = await this.prisma.notification.create({
+        data: {
+          type: 'SYSTEM_ANNOUNCEMENT', // Or create NEW_MESSAGE type
+          title: 'New Message',
+          content: `${message.sender.name} sent you a message`,
+          senderId,
+          receiverId,
+          data: {
+            conversationId,
+            messageId: message.id,
+          },
+        },
+      });
+
+      // Push real-time notification
+      this.notificationGateway.pushNotificationToUser(receiverId, {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        content: notification.content,
+        isRead: false,
+        createdAt: notification.createdAt,
+        sender: {
+          id: message.sender.id,
+          name: message.sender.name,
+          profile: message.sender.profile,
+        },
+        metadata: {
+          conversationId,
+          messageId: message.id,
+        },
+      });
+    }
 
     // Create "DELIVERED" status for all members
     await this.prisma.privateMessageStatus.createMany({

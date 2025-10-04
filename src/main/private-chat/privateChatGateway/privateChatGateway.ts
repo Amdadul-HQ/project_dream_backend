@@ -20,6 +20,7 @@ import { PrivateMessage, PrivateMessageStatus } from '@prisma/client';
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/private',
+  credentials: true,
 })
 export class PrivateChatGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -46,7 +47,8 @@ export class PrivateChatGateway
 
   /** 🔹 Authenticate user & join personal room */
   handleConnection(client: Socket) {
-    const token = client.handshake.headers.authorization?.split(' ')[1];
+    const token = client.handshake.auth.token;
+    console.log(token, 'token');
     if (!token) return client.disconnect();
 
     try {
