@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Body,
   Param,
   Delete,
   Query,
@@ -16,18 +15,16 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
-import { FollowService } from './services/user-follower.service';
+import { FollowService } from '../services/user-follower.service';
 
-@ApiTags('User ---')
-@Controller('user')
+@ApiTags('User Follow---')
 @ApiBearerAuth()
 @ValidateAuth()
-@Controller('user')
-export class UserController {
+@Controller('follow')
+export class FollowController {
   constructor(private readonly followService: FollowService) {}
 
-  @ApiTags('User Follow---')
-  @Post('follow/:userId')
+  @Post(':userId')
   @ApiOperation({ summary: 'Follow a user' })
   @ApiParam({
     name: 'userId',
@@ -40,8 +37,8 @@ export class UserController {
   ) {
     return this.followService.followUser(followerId, followeeId);
   }
-  @ApiTags('User Follow---')
-  @Delete('follow/:userId')
+
+  @Delete(':userId')
   @ApiOperation({ summary: 'Unfollow a user' })
   @ApiParam({
     name: 'userId',
@@ -54,7 +51,7 @@ export class UserController {
   ) {
     return this.followService.unfollowUser(followerId, followeeId);
   }
-  @ApiTags('User Follow---')
+
   @Get('followers/:userId')
   @ApiOperation({ summary: 'Get followers of a user' })
   @ApiParam({
@@ -83,7 +80,7 @@ export class UserController {
   ) {
     return this.followService.getFollowers(userId, page, limit);
   }
-  @ApiTags('User Follow---')
+
   @Get('following/:userId')
   @ApiOperation({ summary: 'Get users that a user is following' })
   @ApiParam({
@@ -112,7 +109,7 @@ export class UserController {
   ) {
     return this.followService.getFollowing(userId, page, limit);
   }
-  @ApiTags('User Follow---')
+
   @Get('check/:userId')
   @ApiOperation({ summary: 'Check if following a user' })
   @ApiParam({
