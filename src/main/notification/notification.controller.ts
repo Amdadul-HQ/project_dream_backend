@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // src/main/notification/notification.controller.ts
 import {
   Controller,
@@ -13,9 +12,12 @@ import {
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { GetUser } from 'src/common/jwt/jwt.decorator';
+import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('notifications')
+@ApiBearerAuth()
+@ValidateAuth()
 export class NotificationController {
   constructor(
     private readonly notificationService: NotificationService,
@@ -26,7 +28,7 @@ export class NotificationController {
   async create(@Body() dto: CreateNotificationDto) {
     const notif = await this.notificationService.createNotification(dto);
     this.gateway.pushNotificationToUser(dto.receiverId, notif);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
     return notif;
   }
 
@@ -35,7 +37,7 @@ export class NotificationController {
     @Req() req,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
-    @GetUser('id') userId: string,
+    @GetUser('userId') userId: string,
   ) {
     return this.notificationService.getNotificationsForUser(
       userId,
@@ -45,17 +47,12 @@ export class NotificationController {
   }
 
   @Patch(':id/read')
-  async markRead(
-    @Param('id') id: string,
-    @Req() req,
-    @GetUser('id') userId: string,
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  async markRead(@Param('id') id: string, @GetUser('userId') userId: string) {
     return await this.notificationService.markAsRead(id, userId);
   }
 
   @Patch('me/mark-all-read')
-  async markAllRead(@Req() req, @GetUser('id') userId: string) {
+  async markAllRead(@Req() req, @GetUser('userId') userId: string) {
     const res = await this.notificationService.markAllRead(userId);
     this.gateway.pushNotificationToUser(userId, { type: 'all_read' });
     return res;

@@ -58,18 +58,12 @@ export class NotificationGateway
    * Push notification to a specific user
    */
   pushNotificationToUser(userId: string, payload: unknown) {
-    console.log('🎯 Gateway: Pushing to user room:', this.userRoom(userId));
-    console.log('🎯 Gateway: Online users:', Array.from(this.onlineMap.keys()));
-    console.log('🎯 Gateway: Payload:', payload);
-
     const room: BroadcastOperator<any, any> = this.server.to(
       this.userRoom(userId),
     );
 
     // CHANGE THIS: notification:created -> notification:new
     room.emit('notification:new', payload);
-
-    console.log('✅ Gateway: Emitted notification:new event');
   }
 
   @SubscribeMessage('notification:markAllRead')

@@ -48,6 +48,7 @@ export class NotificationService {
     const notif = await this.prisma.notification.findUnique({
       where: { id: notificationId },
     });
+    console.log(notif, 'helloeo', userId);
     if (!notif || notif.receiverId !== userId) {
       throw new NotFoundException('Notification not found');
     }
