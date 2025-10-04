@@ -15,13 +15,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
-import { createPostSwaggerSchema } from './dto/create-post-swagger-schema';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
-import { CreatePostService } from './services/post-create.service';
-import { CreateSeriesDto } from './dto/create-post-series.dto';
-import { CreatePostDto } from './dto/create-post.dto';
-import { PostSeriesService } from './services/post-series.service';
+import { CreatePostService } from '../services/post-create.service';
+import { createPostSwaggerSchema } from '../dto/create-post-swagger-schema';
+import { CreatePostDto } from '../dto/create-post.dto';
 
 @ApiTags('Writer ---')
 @Controller('writer/post')
@@ -32,10 +30,6 @@ export class PostController {
   constructor(
     private readonly createPostService: CreatePostService,
     private readonly cloudinaryService: CloudinaryService,
-    private readonly postSeriesService: PostSeriesService,
-    // private readonly updatePostService: UpdatePostService,
-    // private readonly postsService: PostsService,
-    // private readonly deleteService: DeletePostService,
   ) {}
   //create a post
   @Post()
@@ -77,11 +71,6 @@ export class PostController {
     let thumbnailUrl;
     let audioUrl;
 
-    // Convert categoryIds string -> array if needed
-    // if (dto.categoryIds && typeof dto.categoryIds === 'string') {
-    //   dto.categoryIds = dto.categoryIds?.split(',').map((id) => id.trim());
-    // }
-
     if (files.thumbnail?.[0]) {
       const result = await this.cloudinaryService.uploadImageFromBuffer(
         files.thumbnail[0].buffer,
@@ -104,38 +93,5 @@ export class PostController {
       audioUrl,
       userId,
     );
-  }
-
-  findAll() {
-    return `This action returns all post`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} post`;
-  }
-
-  // update(id: number, updatePostDto: UpdatePostDto) {
-  //   return `This action updates a #${id} post`;
-  // }
-
-  remove(id: number) {
-    return `This action removes a #${id} post`;
-  }
-
-  // Post series create, update, get, delete
-  @Post('/create-series')
-  @ApiOperation({ summary: 'Create a post series' })
-  async createSeries(
-    @Body() dto: CreateSeriesDto,
-    @GetUser('userId') userId: string,
-  ) {
-    return this.postSeriesService.createSeries(dto, userId);
-  }
-
-  // Get Series by user
-  @Post('/series-by-user')
-  @ApiOperation({ summary: 'Get all series by the authenticated user' })
-  async getSeriesByUser(@GetUser('userId') userId: string) {
-    return this.postSeriesService.getSeriesByUserId(userId);
   }
 }
