@@ -1,3 +1,7 @@
+// ============================================================================
+// UPDATED: follow.service.ts (user-follower.service.ts)
+// ============================================================================
+
 import {
   Injectable,
   NotFoundException,
@@ -5,15 +9,21 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/lib/prisma/prisma.service';
+import { NotificationGateway } from 'src/main/notification/notification.gateway';
 
 @Injectable()
 export class FollowService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationGateway: NotificationGateway, // ADDED
+  ) {}
 
   /**
    * Follow a user
    */
   async followUser(followerId: string, followeeId: string) {
+    console.log('🔄 Follow request:', { followerId, followeeId });
+
     // Prevent self-follow
     if (followerId === followeeId) {
       throw new BadRequestException('You cannot follow yourself');
@@ -22,7 +32,7 @@ export class FollowService {
     // Check if followee exists
     const followee = await this.prisma.user.findUnique({
       where: { id: followeeId },
-      select: { id: true, name: true, status: true },
+      select: { id: true, name: true, status: true, profile: true },
     });
 
     if (!followee) {
@@ -48,6 +58,14 @@ export class FollowService {
       throw new ConflictException('You are already following this user');
     }
 
+    // Get follower info for notification
+    const follower = await this.prisma.user.findUnique({
+      where: { id: followerId },
+      select: { id: true, name: true, profile: true },
+    });
+
+    console.log('👤 Follower info:', follower);
+
     // Create follow relationship
     const follow = await this.prisma.follow.create({
       data: {
@@ -66,23 +84,54 @@ export class FollowService {
       },
     });
 
+    console.log('✅ Follow relationship created:', follow.id);
+
     // Update user stats for both users
     await Promise.all([
       this.updateFollowerStats(followerId, 'INCREMENT'),
       this.updateFolloweeStats(followeeId, 'INCREMENT'),
     ]);
 
-    // Create notification
-    await this.prisma.notification.create({
+    // Create notification in database
+    const notification = await this.prisma.notification.create({
       data: {
         type: 'NEW_FOLLOWER',
         title: 'New Follower',
-        content: `${followee.name} started following you`,
+        content: `${follower?.name} started following you`,
         senderId: followerId,
         receiverId: followeeId,
         followId: follow.id,
       },
     });
+
+    // ⚡ PUSH REAL-TIME NOTIFICATION VIA WEBSOCKET
+    try {
+      const notificationPayload = {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        content: notification.content,
+        isRead: notification.isRead,
+        createdAt: notification.createdAt,
+        sender: {
+          id: follower?.id,
+          name: follower?.name,
+          profile: follower?.profile,
+        },
+        metadata: {
+          followId: follow.id,
+        },
+      };
+
+      this.notificationGateway.pushNotificationToUser(
+        followeeId,
+        notificationPayload,
+      );
+
+      console.log('✅ Notification pushed successfully');
+    } catch (error) {
+      console.error('❌ Failed to push notification:', error);
+    }
 
     // Create activity log
     await this.prisma.recentActivity.create({
