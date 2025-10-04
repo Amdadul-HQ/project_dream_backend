@@ -5,9 +5,16 @@ import { CommentController } from './controller/post-comment.controller';
 import { CommentService } from './services/user-post-comment.service';
 import { PostLikeController } from './controller/post-like.controller';
 import { PostLikeService } from './services/user-post-like.service';
+import { ReportController } from './controller/post-report.controller';
+import { ReportService } from './services/user-post-report.service';
 
 @Module({
-  controllers: [FollowController, CommentController, PostLikeController],
-  providers: [FollowService, CommentService, PostLikeService],
+  controllers: [
+    FollowController,
+    CommentController,
+    PostLikeController,
+    ReportController,
+  ],
+  providers: [FollowService, CommentService, PostLikeService, ReportService],
 })
 export class UserModule {}
