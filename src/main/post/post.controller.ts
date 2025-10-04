@@ -6,7 +6,6 @@ import {
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { CreatePostDto } from './dto/create-post.dto';
 // import { UpdatePostDto } from './dto/update-post.dto';
 import {
   ApiBearerAuth,
@@ -20,6 +19,9 @@ import { createPostSwaggerSchema } from './dto/create-post-swagger-schema';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
 import { CreatePostService } from './services/post-create.service';
+import { CreateSeriesDto } from './dto/create-post-series.dto';
+import { CreatePostDto } from './dto/create-post.dto';
+import { PostSeriesService } from './services/post-series.service';
 
 @ApiTags('Writer ---')
 @Controller('writer/post')
@@ -30,6 +32,7 @@ export class PostController {
   constructor(
     private readonly createPostService: CreatePostService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly postSeriesService: PostSeriesService,
     // private readonly updatePostService: UpdatePostService,
     // private readonly postsService: PostsService,
     // private readonly deleteService: DeletePostService,
@@ -70,6 +73,7 @@ export class PostController {
     },
     @GetUser('userId') userId: string,
   ) {
+    console.log(dto, '---');
     let thumbnailUrl;
     let audioUrl;
 
@@ -116,5 +120,22 @@ export class PostController {
 
   remove(id: number) {
     return `This action removes a #${id} post`;
+  }
+
+  // Post series create, update, get, delete
+  @Post('/create-series')
+  @ApiOperation({ summary: 'Create a post series' })
+  async createSeries(
+    @Body() dto: CreateSeriesDto,
+    @GetUser('userId') userId: string,
+  ) {
+    return this.postSeriesService.createSeries(dto, userId);
+  }
+
+  // Get Series by user
+  @Post('/series-by-user')
+  @ApiOperation({ summary: 'Get all series by the authenticated user' })
+  async getSeriesByUser(@GetUser('userId') userId: string) {
+    return this.postSeriesService.getSeriesByUserId(userId);
   }
 }

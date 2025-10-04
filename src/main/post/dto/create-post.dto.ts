@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PostStatus } from '@prisma/client';
 import {
@@ -10,7 +11,7 @@ import {
   IsInt,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreatePostDto {
   @ApiProperty({
@@ -24,7 +25,7 @@ export class CreatePostDto {
 
   @ApiProperty({
     description: 'The content of the post in JSON format (Editor.js format)',
-    example: {
+    example: JSON.stringify({
       blocks: [
         { type: 'header', data: { text: 'Introduction' } },
         {
@@ -32,13 +33,22 @@ export class CreatePostDto {
           data: { text: 'This post will cover advanced NestJS topics.' },
         },
       ],
-    },
-    type: 'object',
-    additionalProperties: true,
+    }),
+    type: String,
+  })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    return value;
   })
   @IsObject()
   @IsNotEmpty()
-  content: object; // JSON type in Prisma
+  content: any; // JSON type in Prisma
 
   @ApiPropertyOptional({
     description: 'Short excerpt or summary of the post for SEO and previews',
@@ -50,23 +60,45 @@ export class CreatePostDto {
   excerpt?: string;
 
   @ApiProperty({
-    description: 'Array of category IDs to associate with the post',
-    example: [
-      '09876543-210e-dcba-9876-543210fedcba',
-      'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    ],
-    type: [String],
-    isArray: true,
+    description:
+      'Array of category IDs to associate with the post (comma-separated string or array)',
+    example:
+      '09876543-210e-dcba-9876-543210fedcba,a1b2c3d4-e5f6-7890-1234-567890abcdef',
+    type: String,
+  })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+    }
+    if (Array.isArray(value)) {
+      return value;
+    }
+    return [value];
   })
   @IsArray()
   @IsNotEmpty()
   categoryIds: string[];
 
   @ApiPropertyOptional({
-    description: 'Array of tag names or IDs to associate with the post',
-    example: ['nestjs', 'typescript', 'backend'],
-    type: [String],
-    isArray: true,
+    description: 'Array of tag names (comma-separated string or array)',
+    example: 'nestjs,typescript,backend',
+    type: String,
+  })
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    }
+    if (Array.isArray(value)) {
+      return value;
+    }
+    return [value];
   })
   @IsArray()
   @IsString({ each: true })
@@ -154,7 +186,11 @@ export class CreatePostDto {
     description: 'Scheduled publish date and time (ISO 8601 format)',
     example: '2024-12-31T10:00:00Z',
     type: String,
-    format: 'date-time',
+  })
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (value instanceof Date) return value;
+    return new Date(value);
   })
   @IsOptional()
   scheduledAt?: Date;

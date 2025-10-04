@@ -1,5 +1,3 @@
-import { PostStatus } from '@prisma/client';
-
 export const createPostSwaggerSchema = {
   type: 'object',
   properties: {
@@ -9,8 +7,8 @@ export const createPostSwaggerSchema = {
       description: 'The title of the post',
     },
     content: {
-      type: 'object',
-      example: {
+      type: 'string',
+      example: JSON.stringify({
         blocks: [
           { type: 'header', data: { text: 'Introduction' } },
           {
@@ -18,45 +16,72 @@ export const createPostSwaggerSchema = {
             data: { text: 'This post will cover advanced NestJS topics.' },
           },
         ],
-      },
-      description: 'The content of the post in JSON format',
+      }),
+      description: 'The content of the post as JSON string',
+    },
+    excerpt: {
+      type: 'string',
+      example: 'Learn advanced NestJS concepts',
+      description: 'Short excerpt or summary',
     },
     categoryIds: {
-      type: 'array',
-      items: {
-        type: 'string',
-        format: 'uuid',
-      },
-      example: [
-        '09876543-210e-dcba-9876-543210fedcba',
-        'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-      ],
-      description:
-        'The IDs of the categories for the post. Must be sent as multiple form-data keys like: categoryIds=...&categoryIds=...',
+      type: 'string',
+      example:
+        '09876543-210e-dcba-9876-543210fedcba,a1b2c3d4-e5f6-7890-1234-567890abcdef',
+      description: 'Comma-separated category IDs',
+    },
+    tags: {
+      type: 'string',
+      example: 'nestjs,typescript,backend',
+      description: 'Comma-separated tag names',
     },
     seriesname: {
       type: 'string',
       example: 'Introduction to Node.js',
-      description:
-        'The name of the series to create a new one. Cannot be used with seriesId together.',
+      description: 'Name of new series',
     },
     seriesId: {
       type: 'string',
-      format: 'uuid',
       example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-      description:
-        'The ID of the existing series this post belongs to. Cannot be used with seriesname together.',
+      description: 'ID of existing series',
+    },
+    seriesOrder: {
+      type: 'integer',
+      example: 1,
+      description: 'Order in series',
     },
     status: {
       type: 'string',
-      enum: Object.values(PostStatus),
-      example: PostStatus.UNDER_REVIEW,
-      description: 'The initial status of the post',
+      enum: [
+        'DRAFT',
+        'PUBLISHED',
+        'ARCHIVED',
+        'DELETED',
+        'UNDER_REVIEW',
+        'SCHEDULED',
+      ],
+      example: 'DRAFT',
+      description: 'Post status',
+    },
+    metaTitle: {
+      type: 'string',
+      example: 'NestJS Deep Dive - Complete Guide',
+      description: 'SEO meta title',
+    },
+    metaDescription: {
+      type: 'string',
+      example: 'Comprehensive guide to NestJS',
+      description: 'SEO meta description',
+    },
+    scheduledAt: {
+      type: 'string',
+      example: '2024-12-31T10:00:00Z',
+      description: 'Scheduled publish date',
     },
     thumbnail: {
       type: 'string',
       format: 'binary',
-      description: 'Thumbnail image file (required)',
+      description: 'Thumbnail image (required)',
     },
     audio: {
       type: 'string',

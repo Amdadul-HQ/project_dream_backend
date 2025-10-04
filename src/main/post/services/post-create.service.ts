@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   BadRequestException,
@@ -72,6 +73,7 @@ export class CreatePostService {
       const newSeries = await this.prisma.series.create({
         data: {
           name: seriesname,
+          authorId: writerId,
           slug,
           postsCount: 1,
         },

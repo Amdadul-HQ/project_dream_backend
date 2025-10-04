@@ -30,6 +30,7 @@ model User {
   // Relations
   socialMedia     UserSocialMedia?
   posts           Post[]           @relation(name: "PostAuthor")
+  series          Series[] @relation(name: "PostAuthor")
   likedPosts      PostLike[]
   comments        Comment[]
   savedPosts      SavedPost[]
@@ -181,7 +182,8 @@ model Series {
   slug            String           @unique
   description     String?
   thumbnail       String?
-  
+  authorId        String
+  author          User             @relation(name: "PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   posts           Post[]
   postsCount      Int              @default(0)
   
