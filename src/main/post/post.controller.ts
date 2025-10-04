@@ -73,7 +73,7 @@ export class PostController {
     },
     @GetUser('userId') userId: string,
   ) {
-    console.log(dto, '---');
+    console.log(dto, '---', files);
     let thumbnailUrl;
     let audioUrl;
 
@@ -91,14 +91,14 @@ export class PostController {
     }
 
     if (files.audio?.[0]) {
-      const result = await this.cloudinaryService.uploadImageFromBuffer(
+      const result = await this.cloudinaryService.uploadAudioFromBuffer(
         files.audio[0].buffer,
         files.audio[0].originalname,
       );
       audioUrl = result.url;
     }
-
-    return this.createPostService.createPost(
+    console.log(audioUrl, thumbnailUrl, '---');
+    return await this.createPostService.createPost(
       dto,
       thumbnailUrl,
       audioUrl,
