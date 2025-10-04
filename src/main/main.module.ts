@@ -4,6 +4,7 @@ import { PrivateChatModule } from './private-chat/private-chat.module';
 import { NotificationModule } from './notification/notification.module';
 import { PostModule } from './post/post.module';
 import { PostCategoryModule } from './admin/post-category/post-category.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { PostCategoryModule } from './admin/post-category/post-category.module';
     NotificationModule,
     PostModule,
     PostCategoryModule,
+    UserModule,
   ],
   controllers: [],
   providers: [],
