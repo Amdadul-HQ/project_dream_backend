@@ -12,20 +12,24 @@ import { RegisterUserDto } from './dto/auth.dto';
 import { LoginDto } from './dto/login.dto';
 import { UtilsService } from 'src/lib/utils/utils.service';
 import { successResponse } from 'src/common/utils/response.util';
-import { google, oauth2_v2 } from 'googleapis';
+import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import { ENVEnum } from 'src/common/enum/env.enum';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly libUtils: UtilsService,
-    private readonly oauth2Client: OAuth2Client,
+    private readonly googleClient: OAuth2Client,
+    private readonly configService: ConfigService,
   ) {
-    this.oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI,
+    // Initialize OAuth2Client for both methods
+    this.googleClient = new google.auth.OAuth2(
+      ENVEnum.GOOGLE_CLIENT_ID,
+      ENVEnum.GOOGLE_CLIENT_SECRET,
+      ENVEnum.GOOGLE_REDIRECT_URI,
     );
   }
 
@@ -193,7 +197,7 @@ export class AuthService {
       'https://www.googleapis.com/auth/userinfo.profile',
     ];
 
-    const url = this.oauth2Client.generateAuthUrl({
+    const url = this.googleClient.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent',
@@ -203,18 +207,18 @@ export class AuthService {
   }
 
   /**
-   * 🔹 Handle Google OAuth Callback
+   * 🔹 Handle Google OAuth Callback (Authorization Code Flow)
    */
   async handleGoogleCallback(code: string) {
     try {
       // Exchange code for tokens
-      const { tokens } = await this.oauth2Client.getToken(code);
-      this.oauth2Client.setCredentials(tokens);
+      const { tokens } = await this.googleClient.getToken(code);
+      this.googleClient.setCredentials(tokens);
 
       // Get user profile
       const oauth2 = google.oauth2({
         version: 'v2',
-        auth: this.oauth2Client,
+        auth: this.googleClient,
       });
       const { data: profile } = await oauth2.userinfo.get();
 
@@ -222,6 +226,81 @@ export class AuthService {
         throw new BadRequestException('Google profile does not contain email');
       }
 
+      // Ensure email is a string
+      return await this.processGoogleUser({
+        email: String(profile.email),
+        name: profile.name ?? null,
+        picture: profile.picture ?? null,
+      });
+    } catch (error) {
+      console.error('❌ Google OAuth Error:', error);
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        'Failed to authenticate with Google',
+      );
+    }
+  }
+
+  /**
+   * 🔹 Handle Google JWT Credential (from @react-oauth/google)
+   */
+  async handleGoogleCredential(credential: string) {
+    try {
+      console.log('🔍 Verifying Google JWT credential...');
+
+      // Verify the JWT token with Google
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: credential,
+        audience: this.configService.getOrThrow<string>(
+          ENVEnum.GOOGLE_CLIENT_ID,
+        ),
+      });
+
+      const payload = ticket.getPayload();
+
+      if (!payload || !payload.email) {
+        throw new BadRequestException('Invalid Google credential');
+      }
+
+      console.log('✅ Google JWT verified:', payload.email);
+
+      // Create profile object compatible with existing flow
+      const profile = {
+        email: payload.email,
+        name: payload.name || 'Google User',
+        picture: payload.picture,
+      };
+
+      return await this.processGoogleUser(profile);
+    } catch (error) {
+      console.error('❌ Google credential verification error:', error);
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        'Failed to verify Google credential',
+      );
+    }
+  }
+
+  /**
+   * 🔹 Process Google User (Shared logic for both OAuth and JWT methods)
+   */
+  private async processGoogleUser(profile: {
+    email: string;
+    name?: string | null;
+    picture?: string | null;
+  }) {
+    try {
       // Check if user exists
       let user = await this.prisma.user.findUnique({
         where: { email: profile.email },
@@ -239,22 +318,24 @@ export class AuthService {
           );
         }
 
-        // Update last active
+        // Update last active and profile picture if not set
         await this.prisma.user.update({
           where: { id: user.id },
           data: {
             lastActiveAt: new Date(),
-            // Update profile picture if not set
             profile: user.profile || profile.picture || null,
+            isGoogle: true, // Mark as Google user if not already
           },
         });
+
+        console.log('ℹ️ Existing user logged in:', user.email);
       } else {
-        // Create new user with Google OAuth
+        // Create new user with Google
         user = await this.prisma.$transaction(async (tx) => {
           const newUser = await tx.user.create({
             data: {
               name: profile.name || 'Google User',
-              email: profile.email!,
+              email: profile.email,
               profile: profile.picture || null,
               role: Role.USER,
               isGoogle: true,
@@ -299,94 +380,19 @@ export class AuthService {
         sub: user.id,
       });
 
-      return successResponse(
-        { user, token },
-        user.isGoogle
-          ? 'Google login successful'
-          : 'Account linked with Google',
-      );
-    } catch (error) {
-      console.error('❌ Google OAuth Error:', error);
+      const result = { user, token };
 
-      if (
-        error instanceof BadRequestException ||
-        error instanceof UnauthorizedException
-      ) {
+      return successResponse(result, 'Google login successful');
+    } catch (error) {
+      console.error('❌ Process Google User Error:', error);
+
+      if (error instanceof UnauthorizedException) {
         throw error;
       }
 
       throw new InternalServerErrorException(
-        'Failed to authenticate with Google',
+        'Failed to process Google authentication',
       );
-    }
-  }
-
-  /**
-   * 🔹 Legacy Google Login (for backward compatibility)
-   */
-  async googleLogin(profile: oauth2_v2.Schema$Userinfo) {
-    try {
-      if (!profile?.email) {
-        throw new BadRequestException('Google profile does not contain email');
-      }
-
-      let user = await this.prisma.user.findUnique({
-        where: { email: profile.email },
-        include: {
-          socialMedia: true,
-          userStats: true,
-        },
-      });
-
-      if (!user) {
-        user = await this.prisma.$transaction(async (tx) => {
-          const newUser = await tx.user.create({
-            data: {
-              name: profile.name || 'Google User',
-              email: profile.email!,
-              profile: profile.picture || null,
-              role: Role.USER,
-              isGoogle: true,
-              isVerified: true,
-              phone: null,
-              address: null,
-            },
-            include: {
-              socialMedia: true,
-              userStats: true,
-            },
-          });
-
-          await tx.auth.create({
-            data: {
-              email: newUser.email,
-              name: newUser.name,
-              password: 'GOOGLE_OAUTH_USER',
-              role: Role.USER,
-              userId: newUser.id,
-            },
-          });
-
-          await tx.userStats.create({
-            data: {
-              userId: newUser.id,
-            },
-          });
-
-          return newUser;
-        });
-      }
-
-      const token = this.libUtils.generateToken({
-        email: user.email,
-        roles: user.role,
-        sub: user.id,
-      });
-
-      return successResponse({ user, token }, 'Google login successful');
-    } catch (error) {
-      console.error('❌ Error in googleLogin:', error);
-      throw new InternalServerErrorException('Google login failed');
     }
   }
 }

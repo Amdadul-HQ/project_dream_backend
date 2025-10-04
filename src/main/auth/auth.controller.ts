@@ -16,7 +16,7 @@ import { registerUserSwaggerSchema } from './dto/registration.swagger';
 import { RegisterUserDto } from './dto/auth.dto';
 import { CloudinaryService } from 'src/lib/cloudinary/cloudinary.service';
 import { LoginDto } from './dto/login.dto';
-import { GoogleLoginDto } from './dto/googleLogin.dto';
+import { GoogleCredentialDto, GoogleLoginDto } from './dto/googleLogin.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -115,8 +115,21 @@ export class AuthController {
    * 🔹 Google Login with Authorization Code (Alternative method)
    */
   @Post('google/login')
-  @ApiOperation({ summary: 'Google Login with Code' })
+  @ApiOperation({ summary: 'Google Login with Authorization Code' })
   async handleGoogleCode(@Body() googleLoginDto: GoogleLoginDto) {
     return await this.authService.handleGoogleCallback(googleLoginDto.code);
+  }
+
+  /**
+   * 🔹 Google Login with JWT Credential (from @react-oauth/google)
+   */
+  @Post('google/credential')
+  @ApiOperation({ summary: 'Google Login with JWT Credential' })
+  @ApiBody({
+    description: 'Google JWT credential token from @react-oauth/google',
+    type: GoogleCredentialDto,
+  })
+  async handleGoogleCredential(@Body() dto: GoogleCredentialDto) {
+    return await this.authService.handleGoogleCredential(dto.credential);
   }
 }
