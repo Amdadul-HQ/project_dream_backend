@@ -1,4 +1,4 @@
-import { Body, Controller, Injectable, Post } from '@nestjs/common';
+import { Body, Controller, Get, Injectable, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GetUser, ValidateAuth } from 'src/common/jwt/jwt.decorator';
 import { PostSeriesService } from '../services/post-series.service';
@@ -23,7 +23,7 @@ export class PostSeriesController {
   }
 
   // Get Series by user
-  @Post('/series-by-user')
+  @Get('/series-by-user')
   @ApiOperation({ summary: 'Get all series by the authenticated user' })
   async getSeriesByUser(@GetUser('userId') userId: string) {
     return this.postSeriesService.getSeriesByUserId(userId);
